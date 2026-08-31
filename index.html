@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>Lectro Dashboard</title>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#151922; --panel2:#1b2028; --line:#272d3a;
+    --tx:#eef1f7; --dim:#8e98aa; --acc:#38bdf8; --ok:#34d399;
+    --warn:#fbbf24; --bad:#f87171;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--tx)}
+  body{padding:14px;padding-bottom:36px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;gap:8px}
+  h1{font-size:17px;margin:0;letter-spacing:.2px}
+  .badge{font-size:11px;color:var(--dim);border:1px solid var(--line);
+         padding:3px 8px;border-radius:99px;white-space:nowrap}
+  .badge.live{color:var(--ok);border-color:var(--ok)}
+  .badge.off{color:var(--bad);border-color:var(--bad)}
+
+  button{
+    background:var(--acc);color:#04121f;border:0;border-radius:11px;
+    padding:15px 18px;font-size:16px;font-weight:700;cursor:pointer;width:100%;
+  }
+  button.sec{background:var(--panel2);color:var(--tx);border:1px solid var(--line);
+             font-weight:600;font-size:14px;padding:11px}
+  button:disabled{opacity:.4}
+
+  .speed{
+    background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:20px 16px;text-align:center;margin:12px 0;
+  }
+  .speed .n{font-size:76px;font-weight:800;line-height:1;letter-spacing:-2px;
+            font-variant-numeric:tabular-nums}
+  .speed .u{font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;
+            margin-top:6px;cursor:pointer;display:inline-block}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:12px}
+  .tile .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+  .tile .v{font-size:25px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+  .tile .v small{font-size:12px;color:var(--dim);font-weight:600;margin-left:2px}
+  .tile.on   .v{color:var(--ok)}
+  .tile.offv .v{color:var(--dim)}
+
+  .bar{height:7px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:9px}
+  .bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .4s}
+  .bar i.low{background:var(--warn)} .bar i.crit{background:var(--bad)}
+
+  .alert{background:rgba(248,113,113,.12);border:1px solid var(--bad);color:var(--bad);
+         border-radius:11px;padding:11px 13px;margin:12px 0;font-size:14px;font-weight:600}
+
+  h2{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;
+     margin:20px 0 8px;font-weight:700}
+
+  .status{font-size:13px;padding:10px 12px;border-radius:9px;background:var(--panel2);
+          border:1px solid var(--line);margin-bottom:10px;color:var(--dim)}
+  .status.bad{border-color:var(--bad);color:var(--bad)}
+  .status.ok{border-color:var(--ok);color:var(--ok)}
+
+  details{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+          padding:10px 12px;margin-top:12px}
+  summary{cursor:pointer;color:var(--dim);font-size:13px;font-weight:600}
+  pre{background:#05070a;border:1px solid var(--line);border-radius:8px;padding:9px;
+      font-size:10.5px;line-height:1.5;overflow:auto;max-height:34vh;margin:9px 0 0;
+      font-family:ui-monospace,Menlo,Consolas,monospace;white-space:pre}
+  .foot{color:var(--dim);font-size:11.5px;margin-top:14px;text-align:center}
+  .row{display:flex;gap:8px;margin-top:9px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lectro Dashboard</h1>
+  <span id="conn" class="badge off">offline</span>
+</header>
+
+<div id="status" class="status">Checking Bluetooth support&hellip;</div>
+<button id="connect">Connect to bike</button>
+
+<div class="speed">
+  <div class="n" id="speed">--</div>
+  <div class="u" id="unit" title="Tap to switch units">km/h</div>
+</div>
+
+<div id="errbox"></div>
+
+<div class="grid">
+  <div class="tile">
+    <div class="k">Battery</div>
+    <div class="v"><span id="batpct">--</span><small>%</small></div>
+    <div class="bar"><i id="batbar"></i></div>
+  </div>
+  <div class="tile">
+    <div class="k">Pack voltage</div>
+    <div class="v"><span id="volt">--</span><small>V</small></div>
+  </div>
+  <div class="tile">
+    <div class="k">Range left</div>
+    <div class="v"><span id="range">--</span><small>km</small></div>
+  </div>
+  <div class="tile">
+    <div class="k">Current draw</div>
+    <div class="v"><span id="amps">--</span><small>A</small></div>
+  </div>
+  <div class="tile">
+    <div class="k">Assist level</div>
+    <div class="v" id="gear">--</div>
+  </div>
+  <div class="tile" id="lampTile">
+    <div class="k">Front light</div>
+    <div class="v" id="lamp">--</div>
+  </div>
+  <div class="tile" id="walkTile">
+    <div class="k">Walk mode</div>
+    <div class="v" id="walk">--</div>
+  </div>
+  <div class="tile" id="thrTile">
+    <div class="k">Throttle</div>
+    <div class="v" id="thr">--</div>
+  </div>
+</div>
+
+<h2>This ride</h2>
+<div class="grid">
+  <div class="tile"><div class="k">Distance</div>
+    <div class="v"><span id="tDist">0.00</span><small>km</small></div></div>
+  <div class="tile"><div class="k">Moving time</div>
+    <div class="v" id="tTime">0:00</div></div>
+  <div class="tile"><div class="k">Average</div>
+    <div class="v"><span id="tAvg">0.0</span><small>km/h</small></div></div>
+  <div class="tile"><div class="k">Top speed</div>
+    <div class="v"><span id="tMax">0.0</span><small>km/h</small></div></div>
+</div>
+<div class="row">
+  <button class="sec" id="reset">Reset ride</button>
+  <button class="sec" id="keepawake">Keep screen on</button>
+</div>
+
+<details>
+  <summary>Bike info &amp; raw data</summary>
+  <div style="font-size:13px;color:var(--dim);margin-top:8px" id="info">
+    Model: &mdash; &nbsp;·&nbsp; Firmware: &mdash;
+  </div>
+  <div style="font-size:12px;color:var(--acc);margin-top:6px;font-family:ui-monospace,Menlo,Consolas,monospace"
+       id="chan">no packets yet</div>
+  <div style="font-size:12px;color:var(--dim);margin-top:4px;font-family:ui-monospace,Menlo,Consolas,monospace"
+       id="errdbg"></div>
+  <pre id="raw">Waiting for data&hellip;</pre>
+  <button class="sec" id="copyraw" style="margin-top:9px">Copy raw log</button>
+</details>
+
+<div class="foot">Reads your bike directly over Bluetooth. Nothing is uploaded anywhere.</div>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------
+   Protocol recovered from the original HeroLectro app (v3.0).
+   Santroll controller, BLE service FFB0:
+     FFB1 - phone to bike (the old app used it only for firmware updates)
+     FFB2 - bike to phone, telemetry notifications
+   Telemetry packet (bytes read as unsigned):
+     [5],[6]   speed        = (b5*256 + b6) * 0.1   km/h
+     [8]       current sign (0 = discharging, else charging)
+     [9]       current      = b9 * 0.1              A
+     [11],[12] pack voltage = (b11*256 + b12) * 0.01 V
+     [14],[15] range left   = (b14*256 + b15) * 0.1  km
+     [17]      front lamp on/off
+     [18]      walk mode on/off
+     [19]      assist level (gear mode)
+     [21]      switch off flag
+     [23]      throttle mode
+     [25],[26] error code
+   Model packet:   [4],[5],[6] model chars, [7] pack voltage, [8] wheel size code
+   Version packet: [4].[5].[6]
+------------------------------------------------------------------ */
+
+var SVC    = "0000ffb0-0000-1000-8000-00805f9b34fb";
+var C_POLL = "0000ffb2-0000-1000-8000-00805f9b34fb";  // we WRITE the request here
+var C_DATA = "0000ffb1-0000-1000-8000-00805f9b34fb";  // the bike ANSWERS here
+
+/* The bike never speaks unsolicited. The original app ran a background thread
+   that wrote this exact request over and over, then read the reply. Taken
+   verbatim from the app - not a guess. */
+var POLL_CMD = new Uint8Array([0x46, 0x11, 0x10, 0x00, 0x3E, 0x25]);
+var POLL_MS  = 300;
+
+var pollTimer = null, pollChar = null, pollCount = 0;
+
+function $(id){ return document.getElementById(id); }
+
+var device = null, gatt = null, wakeLock = null;
+var mph = false;
+var nominalV = 36;                 // updated if the bike sends its model packet
+var rawLines = [];
+
+var trip = { dist:0, ms:0, max:0, last:0 };
+
+/* ---------- helpers ---------- */
+function setStatus(t, c){
+  var el = $("status"); el.innerHTML = t;
+  el.className = "status" + (c ? " " + c : "");
+}
+function setConn(t, c){
+  var el = $("conn"); el.textContent = t;
+  el.className = "badge" + (c ? " " + c : "");
+}
+function hex(u8){
+  var o = [];
+  for (var i = 0; i < u8.length; i++){
+    var h = u8[i].toString(16); o.push(h.length < 2 ? "0" + h : h);
+  }
+  return o.join(" ");
+}
+function logRaw(s){
+  rawLines.push(s);
+  if (rawLines.length > 400) rawLines = rawLines.slice(-400);
+  $("raw").textContent = rawLines.join("\n");
+}
+function kmh(v){ return mph ? v * 0.621371 : v; }
+function fmt(v, dp){ return (Math.round(v * Math.pow(10, dp)) / Math.pow(10, dp)).toFixed(dp); }
+
+/* Li-ion pack percentage from resting voltage. The controller reports volts,
+   not percent, so this is an estimate - the voltage tile is the ground truth. */
+var CURVE = [[4.20,100],[4.10,92],[4.00,85],[3.95,80],[3.87,70],[3.80,60],
+             [3.75,50],[3.70,40],[3.65,30],[3.60,22],[3.50,15],[3.40,8],
+             [3.30,4],[3.00,0]];
+function batteryPct(volts){
+  var cells = Math.max(7, Math.round(nominalV / 3.6));
+  var pc = volts / cells;
+  if (pc >= CURVE[0][0]) return 100;
+  if (pc <= CURVE[CURVE.length - 1][0]) return 0;
+  for (var i = 0; i < CURVE.length - 1; i++){
+    var a = CURVE[i], b = CURVE[i + 1];
+    if (pc <= a[0] && pc >= b[0]){
+      var f = (pc - b[0]) / (a[0] - b[0]);
+      return Math.round(b[1] + f * (a[1] - b[1]));
+    }
+  }
+  return 0;
+}
+
+/* ---------- packet parsing ---------- */
+function u16(b, hi, lo){ return b[hi] * 256 + b[lo]; }
+
+function parseTelemetry(b){
+  var d = {};
+  if (b.length > 6)  d.speed   = u16(b, 5, 6) * 0.1;
+  if (b.length > 8)  d.charging = b[8] !== 0;
+  if (b.length > 9)  d.amps    = b[9] * 0.1;
+  if (b.length > 12) d.volts   = u16(b, 11, 12) * 0.01;
+  if (b.length > 15) d.range   = u16(b, 14, 15) * 0.1;
+  if (b.length > 17) d.lamp    = b[17] !== 0;
+  if (b.length > 18) d.walk    = b[18] !== 0;
+  if (b.length > 19) d.gear    = b[19];
+  if (b.length > 21) d.off     = b[21] !== 0;
+  if (b.length > 23) d.thr     = b[23] !== 0;
+  if (b.length > 26) d.err     = u16(b, 25, 26);
+  else if (b.length > 25) d.err = b[25];
+  return d;
+}
+
+function parseModel(b){
+  if (b.length < 9) return null;
+  var name = "";
+  for (var i = 4; i <= 6; i++){
+    if (b[i] >= 32 && b[i] < 127) name += String.fromCharCode(b[i]);
+  }
+  return { model: name.trim(), volts: b[7], wheel: b[8] };
+}
+
+function parseVersion(b){
+  if (b.length < 7) return null;
+  return b[4] + "." + b[5] + "." + b[6];
+}
+
+/* ---------- rendering ---------- */
+var modelName = null, fwVersion = null;
+
+function renderInfo(){
+  $("info").innerHTML = "Model: " + (modelName || "&mdash;") +
+    " &nbsp;·&nbsp; Firmware: " + (fwVersion || "&mdash;") +
+    " &nbsp;·&nbsp; Pack: " + nominalV + "V";
+}
+
+function boolTile(tileId, valId, on, onText, offText){
+  $(valId).textContent = on ? onText : offText;
+  $(tileId).className = "tile " + (on ? "on" : "offv");
+}
+
+function render(d){
+  var now = Date.now();
+
+  if (d.speed !== undefined){
+    $("speed").textContent = fmt(kmh(d.speed), 1);
+    // integrate distance between packets
+    if (trip.last){
+      var dt = (now - trip.last) / 1000;
+      if (dt > 0 && dt < 5){
+        trip.dist += d.speed * (dt / 3600);
+        if (d.speed > 0.5) trip.ms += dt * 1000;
+      }
+    }
+    trip.last = now;
+    if (d.speed > trip.max) trip.max = d.speed;
+    renderTrip();
+  }
+
+  if (d.volts !== undefined){
+    $("volt").textContent = fmt(d.volts, 1);
+    var p = batteryPct(d.volts);
+    $("batpct").textContent = p;
+    var bar = $("batbar");
+    bar.style.width = p + "%";
+    bar.className = p <= 12 ? "crit" : (p <= 30 ? "low" : "");
+  }
+  if (d.range !== undefined) $("range").textContent = fmt(kmh(d.range), 1);
+  /* Byte 8 is the charge/discharge sign, but it read "charging" on a bike that
+     was sitting idle and unplugged, so the polarity is not what I assumed.
+     Show the magnitude only rather than assert a direction that may be wrong;
+     the raw flag goes to the debug panel so it can be settled while charging. */
+  if (d.amps !== undefined) $("amps").textContent = fmt(d.amps, 1);
+  if (d.gear  !== undefined) $("gear").textContent = d.gear;
+
+  if (d.lamp !== undefined) boolTile("lampTile", "lamp", d.lamp, "ON", "OFF");
+  if (d.walk !== undefined) boolTile("walkTile", "walk", d.walk, "ON", "OFF");
+  if (d.thr  !== undefined) boolTile("thrTile",  "thr",  d.thr,  "ON", "OFF");
+
+  /* Only trust small values as real fault codes. Controllers use low numbers;
+     anything large means these two bytes are not the error code and the banner
+     would be a false alarm. Unverified values go to the debug panel instead. */
+  if (d.err !== undefined){
+    $("errbox").innerHTML = (d.err > 0 && d.err < 256)
+      ? '<div class="alert">Controller error code ' + d.err + '</div>'
+      : "";
+    $("errdbg").textContent = "raw error bytes: " + d.err +
+      (d.err >= 256 ? "  (ignored - almost certainly the wrong offset)" : "") +
+      "   ·   charge flag (byte 8): " + (d.charging ? "1" : "0");
+  }
+}
+
+function renderTrip(){
+  $("tDist").textContent = fmt(kmh(trip.dist), 2);
+  var s = Math.floor(trip.ms / 1000);
+  var m = Math.floor(s / 60), h = Math.floor(m / 60);
+  m = m % 60; s = s % 60;
+  $("tTime").textContent = h
+    ? h + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0")
+    : m + ":" + String(s).padStart(2, "0");
+  var hrs = trip.ms / 3600000;
+  $("tAvg").textContent = fmt(hrs > 0 ? kmh(trip.dist) / hrs : 0, 1);
+  $("tMax").textContent = fmt(kmh(trip.max), 1);
+}
+
+var channels = {};
+
+function shortId(uuid){
+  var m = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/.exec(uuid);
+  return m ? m[1].toUpperCase() : uuid;
+}
+
+function onPacket(dv, from){
+  var b = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+  var t = new Date().toLocaleTimeString([], {hour12:false});
+  from = from || "?";
+
+  channels[from] = (channels[from] || 0) + 1;
+  var parts = [];
+  for (var k in channels) parts.push(k + " x" + channels[k]);
+  $("chan").textContent = parts.join("   ");
+
+  logRaw("[" + t + "] " + from + " len=" + b.length + "  " + hex(b));
+
+  if (b.length >= 20){
+    render(parseTelemetry(b));
+  } else if (b.length >= 10 && b.length <= 16){
+    var m = parseModel(b);
+    if (m){
+      if (m.model) modelName = m.model;
+      if (m.volts >= 24 && m.volts <= 72) nominalV = m.volts;
+      renderInfo();
+      logRaw("   -> model packet: " + JSON.stringify(m));
+    }
+  } else if (b.length === 9){
+    fwVersion = parseVersion(b);
+    renderInfo();
+    logRaw("   -> version packet: " + fwVersion);
+  }
+}
+
+/* ---------- connection ---------- */
+if (!navigator.bluetooth){
+  setStatus("This browser cannot use Bluetooth. Open this file in <b>Google Chrome</b> " +
+            "on Android or Windows (on iPhone use the <b>Bluefy</b> browser app).", "bad");
+  $("connect").disabled = true;
+} else {
+  setStatus("Turn the bike on, keep the phone near it, then tap Connect.");
+}
+
+$("connect").onclick = function(){
+  (async function(){
+    try {
+      setStatus("Choose your bike in the Bluetooth list&hellip;");
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SVC] }],
+        optionalServices: [SVC]
+      });
+      await connect();
+    } catch (e){
+      if (e && e.name === "NotFoundError"){
+        setStatus("No bike selected. If the list was empty, make sure the bike is " +
+                  "switched on and not still paired to another phone.", "bad");
+      } else {
+        setStatus("Error: " + (e.message || e), "bad");
+      }
+    }
+  })();
+};
+
+async function connect(){
+  setConn("connecting", "");
+  setStatus("Connecting&hellip;");
+
+  device.addEventListener("gattserverdisconnected", onDrop);
+  gatt = await device.gatt.connect();
+
+  var svc = await gatt.getPrimaryService(SVC);
+
+  /* The bike exposes several notify channels (FF03, FF04, FFB1, FFB2) and the
+     telemetry does not necessarily arrive on the one the old app named. Listen
+     to every one of them and let the packet itself say what it is. */
+  var chars = await svc.getCharacteristics();
+  var listening = 0;
+
+  for (var i = 0; i < chars.length; i++){
+    var c = chars[i];
+
+    if (c.properties.read){
+      try {
+        var v = await c.readValue();
+        logRaw("read " + shortId(c.uuid) + " : " + hex(
+          new Uint8Array(v.buffer, v.byteOffset, v.byteLength)));
+      } catch (e){ /* not all readable characteristics actually read */ }
+    }
+
+    if (c.properties.notify || c.properties.indicate){
+      try {
+        c.addEventListener("characteristicvaluechanged", function(ev){
+          onPacket(ev.target.value, shortId(ev.target.uuid));
+        });
+        await c.startNotifications();
+        listening++;
+        logRaw("listening on " + shortId(c.uuid));
+      } catch (e){
+        logRaw("could not listen on " + shortId(c.uuid) + ": " + (e.message || e));
+      }
+    }
+  }
+
+  logRaw("--- listening on " + listening + " channel(s) ---");
+
+  // Start asking the bike for data; it stays silent otherwise.
+  try {
+    pollChar = await svc.getCharacteristic(C_POLL);
+    startPolling();
+    logRaw("--- polling " + shortId(C_POLL) + " every " + POLL_MS + "ms with "
+           + hex(POLL_CMD) + " ---");
+  } catch (e){
+    logRaw("could not open the request channel: " + (e.message || e));
+  }
+
+  setConn("live", "live");
+  setStatus("Connected to " + (device.name || "bike") +
+            ". Data updates as you ride.", "ok");
+  $("connect").textContent = "Reconnect";
+  renderInfo();
+}
+
+function startPolling(){
+  stopPolling();
+  pollTimer = setInterval(function(){
+    if (!pollChar || !gatt || !gatt.connected) return;
+    var p = pollChar.properties.writeWithoutResponse
+      ? pollChar.writeValueWithoutResponse(POLL_CMD)
+      : pollChar.writeValueWithResponse(POLL_CMD);
+    p.then(function(){
+      pollCount++;
+      if (pollCount === 1) logRaw("first request sent OK");
+    }).catch(function(e){
+      if (pollCount === 0){
+        logRaw("request failed: " + (e.message || e));
+        stopPolling();
+      }
+    });
+  }, POLL_MS);
+}
+
+function stopPolling(){
+  if (pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+}
+
+function onDrop(){
+  stopPolling();
+  setConn("offline", "off");
+  setStatus("Bike disconnected. Tap Reconnect when it is back in range.", "bad");
+}
+
+/* ---------- controls ---------- */
+$("unit").onclick = function(){
+  mph = !mph;
+  $("unit").textContent = mph ? "mph" : "km/h";
+  document.querySelectorAll(".tile .v small").forEach(function(el){
+    if (el.textContent === "km" || el.textContent === "mi")
+      el.textContent = mph ? "mi" : "km";
+    if (el.textContent === "km/h" || el.textContent === "mph")
+      el.textContent = mph ? "mph" : "km/h";
+  });
+  renderTrip();
+};
+
+$("reset").onclick = function(){
+  trip = { dist:0, ms:0, max:0, last:0 };
+  renderTrip();
+};
+
+$("keepawake").onclick = function(){
+  (async function(){
+    try {
+      if (wakeLock){
+        await wakeLock.release(); wakeLock = null;
+        $("keepawake").textContent = "Keep screen on";
+      } else {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", function(){
+          wakeLock = null; $("keepawake").textContent = "Keep screen on";
+        });
+        $("keepawake").textContent = "Screen stays on ✓";
+      }
+    } catch (e){
+      setStatus("Could not keep the screen awake on this browser.", "bad");
+    }
+  })();
+};
+
+$("copyraw").onclick = function(){
+  (async function(){
+    try {
+      await navigator.clipboard.writeText(rawLines.join("\n"));
+      setStatus("Raw log copied.", "ok");
+    } catch (e){
+      setStatus("Could not copy - select the text manually.", "bad");
+    }
+  })();
+};
+
+renderTrip();
+renderInfo();
+
+/* Register the offline cache so the dashboard survives without a server.
+   Only works over https or localhost - which is the same requirement
+   Bluetooth has, so if one works the other does too. */
+if ("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("./sw.js").catch(function(){
+      /* not fatal - the dashboard still works, just not offline */
+    });
+  });
+}
+</script>
+</body>
+</html>
