@@ -5,7 +5,11 @@
    from the home screen with no internet, no PC and no server - while still
    counting as a secure page, which is what lets it use Bluetooth. */
 
-var CACHE = "lectro-v1";
+/* IMPORTANT: bump this on every change to the page, icons or manifest.
+   Fetches are served cache-first, and the browser only looks for a new service
+   worker when THIS FILE's bytes change. Ship a new index.html without touching
+   this line and everyone already installed keeps the old version forever. */
+var CACHE = "lectro-v2";
 
 var FILES = [
   "./",
