@@ -33,8 +33,15 @@
   --tx:#000000; --dim:#55555e; --faint:#9a9aa2; --track:#e2e2e6;
   --ink:#ffffff;
 }
+/* Riding in real darkness: pure white on pure black dazzles and wrecks your
+   night vision, so this pulls the whole scale down rather than inverting it. */
+:root[data-theme="dim"]{
+  --bg:#0a0a0c; --panel:#121214; --panel2:#171719; --line:#232327;
+  --tx:#a8a8b0; --dim:#63636b; --faint:#3c3c43; --track:#1c1c1f;
+  --ink:#0a0a0c;
+}
 @media (prefers-color-scheme: light){
-  :root:not([data-theme="night"]):not([data-theme="day"]){
+  :root:not([data-theme="night"]):not([data-theme="day"]):not([data-theme="dim"]){
     --bg:#ffffff; --panel:#ffffff; --panel2:#f2f2f4; --line:#c9c9cf;
     --tx:#000000; --dim:#55555e; --faint:#9a9aa2; --track:#e2e2e6;
     --ink:#ffffff;
@@ -172,10 +179,22 @@ body.stale .chips{opacity:.28}
 .cells i{flex:1;background:var(--track);transform:skewX(-17deg);transition:background .3s}
 .cells i.on{background:var(--tx)}
 .cells i.warn{background:var(--dim)}
-.batsub{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.batsub .vv{font-size:16px;font-weight:800;margin-top:3px;letter-spacing:-.02em}
-.batsub .vv .su{font-family:var(--mono);font-size:9px;color:var(--dim);
-                margin-left:2px;font-weight:700}
+.batsub{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.batsub .vv{font-size:15px;font-weight:800;margin-top:3px;letter-spacing:-.03em}
+.batsub .vv .su{font-family:var(--mono);font-size:8.5px;color:var(--dim);
+                margin-left:1px;font-weight:700}
+
+/* rider setup */
+.setup{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:11px}
+.setup label{display:block}
+.setup .kk{margin-bottom:5px}
+.setup input,.setup select{
+  width:100%;background:var(--panel2);color:var(--tx);border:1px solid var(--line);
+  font-family:var(--mono);font-size:14px;font-weight:700;padding:10px;
+  -webkit-appearance:none;appearance:none;border-radius:0;
+}
+.setup select{background-image:none}
+.hint{color:var(--faint);font-size:11px;line-height:1.6;margin-top:11px}
 
 /* assist: skewed bars */
 .segs{display:flex;gap:3px;margin-top:10px;height:8px}
@@ -198,7 +217,7 @@ h2{
   font-family:var(--mono);font-size:9px;color:var(--dim);text-transform:uppercase;
   letter-spacing:.28em;margin:17px 0 9px;font-weight:700;
 }
-.trip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+.trip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
       margin-bottom:9px;clip-path:var(--chamfer-sm)}
 .trip div{background:var(--panel);padding:12px 6px;text-align:center;min-width:0}
 .trip .tv{font-size:17px;font-weight:800;margin-top:3px;letter-spacing:-.03em}
@@ -276,6 +295,10 @@ pre{
         <div class="kk">Range</div>
         <div class="vv num live-val"><span id="range">--</span><span class="su" id="uRange">km</span></div>
       </div>
+      <div>
+        <div class="kk">Draw</div>
+        <div class="vv num live-val"><span id="amps">--</span><span class="su">A</span></div>
+      </div>
     </div>
   </div>
 
@@ -286,9 +309,9 @@ pre{
   </div>
 
   <div class="card panel">
-    <div class="k">Current</div>
-    <div class="v num live-val"><span id="amps">--</span><span class="su">A</span></div>
-    <div class="segs" style="visibility:hidden"><i></i></div>
+    <div class="k">Your power</div>
+    <div class="v num live-val"><span id="rpow">--</span><span class="su">W</span></div>
+    <div class="segs" id="psegs"></div>
   </div>
 </div>
 
@@ -316,11 +339,50 @@ pre{
   <div><div class="tk">Moving</div><div class="tv num" id="tTime">0:00</div></div>
   <div><div class="tk">Avg</div><div class="tv num"><span id="tAvg">0.0</span><span class="su" id="uAvg">km/h</span></div></div>
   <div><div class="tk">Max</div><div class="tv num"><span id="tMax">0.0</span><span class="su" id="uMax">km/h</span></div></div>
+  <div><div class="tk">Burned</div><div class="tv num"><span id="tCal">0</span><span class="su">kcal</span></div></div>
+  <div><div class="tk">Avg power</div><div class="tv num"><span id="tPow">0</span><span class="su">W</span></div></div>
 </div>
 <div class="row">
   <button class="sec" id="reset">Reset ride</button>
   <button class="sec" id="keepawake">Keep screen on</button>
 </div>
+
+<details class="panel">
+  <summary>Rider setup &mdash; for calorie estimate</summary>
+  <div class="setup">
+    <label>
+      <div class="kk">Your weight</div>
+      <input id="sRider" type="number" inputmode="numeric" min="20" max="400" step="1">
+    </label>
+    <label>
+      <div class="kk">Bike weight</div>
+      <input id="sBike" type="number" inputmode="numeric" min="4" max="150" step="1">
+    </label>
+    <label>
+      <div class="kk">Units</div>
+      <select id="sMass"><option value="kg">kilograms</option><option value="lb">pounds</option></select>
+    </label>
+    <label>
+      <div class="kk">Terrain</div>
+      <select id="sTerrain">
+        <option value="1">Flat</option>
+        <option value="1.18">Rolling</option>
+        <option value="1.4">Hilly</option>
+      </select>
+    </label>
+  </div>
+  <div class="hint">
+    How this works: the bike reports pack voltage and current, so the app knows
+    roughly what the motor contributed. It works out the power needed to move
+    you at your speed, subtracts the motor's share, and treats the remainder as
+    your legs. Throttle along without pedalling and it should read near zero.
+    <br><br>
+    It is an estimate, not a measurement. Your bike has no pedal-torque sensor,
+    so your effort is inferred rather than measured, and hills are approximated
+    by the terrain setting above rather than sensed. Treat it as a decent guide
+    to relative effort between rides, not a calorie count to diet on.
+  </div>
+</details>
 
 <details class="panel">
   <summary>Bike info &amp; raw data</summary>
@@ -381,7 +443,7 @@ var packets = 0;
 var lastPacketAt = 0;
 var maxGear = 5;
 var speedScale = 30;
-var trip = { dist:0, ms:0, max:0, last:0 };
+var trip = { dist:0, ms:0, max:0, last:0, kcal:0, work:0 };
 
 /* ---------- helpers ---------- */
 function setStatus(t, c){
@@ -410,7 +472,7 @@ function fmt(v, dp){ return (Math.round(v * Math.pow(10, dp)) / Math.pow(10, dp)
 
 /* ---------- theme: auto / day / night ----------
    Both themes are monochrome; day is the high-contrast one for sunlight. */
-var THEMES = ["auto", "day", "night"];
+var THEMES = ["auto", "day", "night", "dim"];
 var theme = "auto";
 try { theme = localStorage.getItem("lectro-theme") || "auto"; } catch(e){}
 function applyTheme(){
@@ -445,6 +507,96 @@ function batteryPct(volts){
   }
   return 0;
 }
+
+/* ---------- effort and calories ----------
+   This bike has no pedal-torque sensor, so rider power cannot be measured. It
+   is inferred instead: work out the power needed to move rider + bike at the
+   observed speed, subtract what the motor supplied - which we genuinely do
+   know, from pack volts x amps - and attribute the remainder to the legs.
+
+   The nice consequence is that riding on the throttle alone gives a rider
+   power near zero, because the motor term covers the whole requirement. A
+   fitness app working from speed alone would happily credit that as exercise.
+
+   Hills are the weak point: there is no altimeter here, so an average gradient
+   is approximated by the terrain multiplier rather than sensed. */
+var G_ACC = 9.81, RHO = 1.225;
+var CRR = 0.006;        // city tyres on asphalt
+var CDA = 0.55;         // upright riding position, m^2
+var ETA_MOTOR = 0.78;   // battery watts -> watts delivered at the wheel
+var ETA_HUMAN = 0.24;   // mechanical work -> metabolic energy burned
+
+var rider = { kg:70, bike:25, unit:"kg", terrain:1 };
+try {
+  var savedRider = JSON.parse(localStorage.getItem("lectro-rider") || "null");
+  if (savedRider && savedRider.kg) rider = savedRider;
+} catch(e){}
+
+function riderPower(d){
+  if (d.speed === undefined) return 0;
+  var v = d.speed / 3.6;                       // m/s
+  if (v <= 0.2) return 0;
+  var mass  = rider.kg + rider.bike;           // always held in kg
+  var pRoll = CRR * mass * G_ACC * v * rider.terrain;
+  var pAero = 0.5 * RHO * CDA * v * v * v;
+  var need  = pRoll + pAero;
+  var motor = (d.volts !== undefined && d.amps !== undefined)
+    ? d.volts * d.amps * ETA_MOTOR : 0;
+  return Math.max(0, need - motor);
+}
+
+var PSEGS = 5, pSegEls = [];
+(function buildPowerSegs(){
+  var box = $("psegs");
+  for (var i = 0; i < PSEGS; i++){
+    var e = document.createElement("i");
+    box.appendChild(e); pSegEls.push(e);
+  }
+})();
+
+function showPower(w){
+  $("rpow").textContent = Math.round(w);
+  var lit = Math.max(0, Math.min(PSEGS, Math.round(w / 50)));   // 50W a segment
+  for (var i = 0; i < PSEGS; i++) pSegEls[i].className = i < lit ? "on" : "";
+}
+
+function accumulateEffort(d, dt){
+  var w = riderPower(d);
+  trip.work += w * dt;                          // mechanical joules
+  trip.kcal += (w / ETA_HUMAN) * dt / 4184;     // metabolic kcal
+  showPower(w);
+}
+
+/* ---------- rider setup ---------- */
+function massToDisplay(kg){ return Math.round(rider.unit === "lb" ? kg * 2.20462 : kg); }
+function massFromDisplay(v){ return rider.unit === "lb" ? v / 2.20462 : v; }
+
+function loadSetup(){
+  $("sRider").value   = massToDisplay(rider.kg);
+  $("sBike").value    = massToDisplay(rider.bike);
+  $("sMass").value    = rider.unit;
+  $("sTerrain").value = String(rider.terrain);
+}
+function persistRider(){
+  try { localStorage.setItem("lectro-rider", JSON.stringify(rider)); } catch(e){}
+}
+function saveSetup(){
+  var r = parseFloat($("sRider").value), b = parseFloat($("sBike").value);
+  if (isFinite(r) && r > 0) rider.kg   = massFromDisplay(r);
+  if (isFinite(b) && b > 0) rider.bike = massFromDisplay(b);
+  rider.terrain = parseFloat($("sTerrain").value) || 1;
+  persistRider();
+}
+["sRider", "sBike", "sTerrain"].forEach(function(id){
+  $(id).addEventListener("change", saveSetup);
+});
+/* Switching units must only change how the same mass is displayed - never
+   round-trip the shown value back through the parser, which would drift. */
+$("sMass").addEventListener("change", function(){
+  rider.unit = $("sMass").value;
+  loadSetup();
+  persistRider();
+});
 
 /* ---------- packet parsing ---------- */
 function u16(b, hi, lo){ return b[hi] * 256 + b[lo]; }
@@ -565,6 +717,7 @@ function render(d){
       if (dt > 0 && dt < 5){
         trip.dist += d.speed * (dt / 3600);
         if (d.speed > 0.5) trip.ms += dt * 1000;
+        accumulateEffort(d, dt);
       }
     }
     trip.last = now;
@@ -619,6 +772,9 @@ function renderTrip(){
   var hrs = trip.ms / 3600000;
   $("tAvg").textContent = fmt(hrs > 0 ? kmh(trip.dist) / hrs : 0, 1);
   $("tMax").textContent = fmt(kmh(trip.max), 1);
+  $("tCal").textContent = Math.round(trip.kcal);
+  var movingSec = trip.ms / 1000;
+  $("tPow").textContent = movingSec > 0 ? Math.round(trip.work / movingSec) : 0;
 }
 
 /* Freshness watchdog: while connected, a reading that has stopped updating must
@@ -799,8 +955,9 @@ $("unit").onclick = function(){
 };
 
 $("reset").onclick = function(){
-  trip = { dist:0, ms:0, max:0, last:0 };
+  trip = { dist:0, ms:0, max:0, last:0, kcal:0, work:0 };
   packets = 0;
+  showPower(0);
   renderTrip();
 };
 
@@ -846,6 +1003,8 @@ setUnitLabels();
 setArc(0);
 setCells(0);
 renderSegs(0);
+showPower(0);
+loadSetup();
 renderTrip();
 renderInfo();
 
