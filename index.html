@@ -931,7 +931,6 @@ var cmdsVerified = false;
    drift out of sync with the handlebar controls. */
 var bikeState = { lamp:false, walk:false, gear:0, speed:0, motor:true };
 var walkArmed = false;
-var connectWarned = false;   // one-time 'are you stopped?' gate on Connect
 
 /* Changing assist level while riding is normal - it is exactly what the
    handlebar buttons do - so it is allowed whenever connected. Walk mode and
@@ -1198,22 +1197,12 @@ if (!navigator.bluetooth){
             "on Android or Windows (on iPhone use the <b>Bluefy</b> browser app).", "bad");
   $("connect").disabled = true;
 } else {
-  setStatus("<b>Connect before you set off.</b> Connecting briefly interrupts " +
-            "motor power while the app re-arms it.", "bad");
+  setStatus("Turn the bike on, keep the phone near it, then tap Connect.");
 }
 
 $("connect").onclick = function(){
   (async function(){
     try {
-      /* Connecting inhibits the motor until the connect sequence re-enables
-         it. Confirm once per session rather than let someone tap Connect
-         mid-ride and lose assist at a junction. */
-      if (!connectWarned){
-        connectWarned = true;
-        setStatus("<b>Are you stopped?</b> Connecting interrupts motor power " +
-                  "briefly. Tap Connect again to go ahead.", "bad");
-        return;
-      }
       setStatus("Choose your bike in the Bluetooth list&hellip;");
       device = await navigator.bluetooth.requestDevice({
         filters: [{ services: [SVC] }],
