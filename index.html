@@ -130,7 +130,7 @@ body.connected .primary{
 }
 .k{font-size:9.5px;letter-spacing:.22em}
 .kk,.tk{font-size:8.5px;letter-spacing:.18em}
-.cl{font-size:8.5px;letter-spacing:.16em}
+.cl{font-size:8px;letter-spacing:.1em}
 
 /* ---------------- hero ---------------- */
 .hero{margin-bottom:9px;display:grid;place-items:center;padding:16px 10px 20px}
@@ -226,8 +226,8 @@ body.stale .chips{opacity:.28}
 @media (prefers-reduced-motion:reduce){.chip.armed{animation:none}}
 
 /* state chips: filled when active, outline when not */
-.chips{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:9px}
-.chip{padding:12px 6px;text-align:center}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:9px}
+.chip{padding:11px 4px;text-align:center}
 .chip .ci{width:19px;height:19px;margin:0 auto 6px;display:block;fill:var(--faint);
           transition:fill .25s}
 .chip .cs{font-family:var(--mono);font-size:11px;font-weight:800;color:var(--faint);
@@ -355,6 +355,11 @@ pre{
     <div class="cl">Walk</div>
     <div class="cs" id="walk">--</div>
   </div>
+  <div class="chip panel" id="motorTile">
+    <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 3.5a1.2 1.2 0 0 1 1.2 1.2v5.6a1.2 1.2 0 0 1-2.4 0V6.7A1.2 1.2 0 0 1 12 5.5zM7.5 7.8a1.1 1.1 0 0 1 .5 1.9 5.2 5.2 0 1 0 8 0 1.1 1.1 0 0 1 1.5-1.6 7.4 7.4 0 1 1-11 0 1.1 1.1 0 0 1 1-0.3z"/></svg>
+    <div class="cl">Motor</div>
+    <div class="cs" id="motor">--</div>
+  </div>
   <div class="chip panel" id="chgTile">
     <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
     <div class="cl">Charging</div>
@@ -468,7 +473,14 @@ var C_DATA = "0000ffb1-0000-1000-8000-00805f9b34fb";
 var CMD = {
   POLL:  "46 11 10 00 3E 25",
   REQ_A: "46 11 14 00 F2 E1",     // sent once at connect by the original app
-  REQ_B: "46 11 15 00 C1 D0"      // ditto
+  REQ_B: "46 11 15 00 C1 D0",     // ditto
+  /* Connecting inhibits the motor. The original app re-enables it as the very
+     first thing it sends. Identified from BLEConnectionService.f(), which maps
+     the fields to the model explicitly:
+         f -> setMotorOn()   g -> setLampOn()   h -> setAssistanceMode()
+     and <init> sets f = true, so the connect path picks the 01 variant. */
+  MOTOR_ON:  "46 16 17 01 01 05 30",
+  MOTOR_OFF: "46 16 17 01 00 15 11"
 };
 var MODE_CMD = {
   0x00: "46 16 18 01 00 39 20",   // assist 0
@@ -771,7 +783,8 @@ function parseFrame(f){
     d.walk = t[0x24][1] !== 0;
     d.gear = t[0x24][2];
   }
-  if (t[0x26]) d.err = t[0x26][0];               // 0 while healthy
+  if (t[0x26]) d.err   = t[0x26][0];             // 0 while healthy
+  if (t[0x27]) d.motor = t[0x27][0] !== 0;       // 0 = motor inhibited
   return d;
 }
 
@@ -833,7 +846,7 @@ var cmdsVerified = false;
 /* Last state the BIKE reported - always the source of truth. Commands are
    composed from this, never from an assumed local state, so the app cannot
    drift out of sync with the handlebar controls. */
-var bikeState = { lamp:false, walk:false, gear:0, speed:0 };
+var bikeState = { lamp:false, walk:false, gear:0, speed:0, motor:true };
 var walkArmed = false;
 var connectWarned = false;   // one-time 'are you stopped?' gate on Connect
 
@@ -850,6 +863,18 @@ function sendMode(lamp, walk, assist){
   }
   queueCmd(c);
   return true;
+}
+
+/* Enabling the motor is always allowed - a rider coasting with a dead motor
+   should be able to bring it back. Disabling is blocked while moving, since
+   cutting assist under way is exactly the hazard we are guarding against. */
+function toggleMotor(){
+  if (!cmdsVerified || !(gatt && gatt.connected)) return;
+  if (bikeState.motor && bikeState.speed >= 0.5){
+    setStatus("Not while moving - stop before switching the motor off.", "bad");
+    return;
+  }
+  queueCmd(bikeState.motor ? CMD.MOTOR_OFF : CMD.MOTOR_ON);
 }
 
 function toggleLamp(){
@@ -899,6 +924,7 @@ function renderControls(){
     el.disabled = !motor;
     el.className = (bikeState.gear === i && !bikeState.walk) ? "sel" : "";
   }
+  $("motorTile").classList.toggle("tap", live);
   $("lampTile").classList.toggle("tap", live);
   $("walkTile").classList.toggle("tap", motor);
   $("walkTile").classList.toggle("armed", walkArmed);
@@ -988,6 +1014,7 @@ function render(d){
 
   if (d.lamp !== undefined) setChip("lampTile", "lamp", d.lamp);
   if (d.walk !== undefined) setChip("walkTile", "walk", d.walk);
+  if (d.motor !== undefined) setChip("motorTile", "motor", d.motor);
   setChip("chgTile", "chg", detectCharging(d.volts, d.speed));
 
   /* Track what the bike says so commands are always composed from its real
@@ -996,6 +1023,7 @@ function render(d){
   if (d.walk  !== undefined) bikeState.walk  = d.walk;
   if (d.gear  !== undefined) bikeState.gear  = d.gear;
   if (d.speed !== undefined) bikeState.speed = d.speed;
+  if (d.motor !== undefined) bikeState.motor = d.motor;
   renderControls();
 
   /* Tag 0x26 is a single byte and reads 0 on a healthy bike, so it can be
@@ -1077,22 +1105,20 @@ if (!navigator.bluetooth){
             "on Android or Windows (on iPhone use the <b>Bluefy</b> browser app).", "bad");
   $("connect").disabled = true;
 } else {
-  setStatus("<b>Do not connect while riding.</b> Connecting cuts motor power for " +
-            "a few seconds - the bike does this itself, with any app. Stop first, " +
-            "then connect.", "bad");
+  setStatus("<b>Connect before you set off.</b> Connecting briefly interrupts " +
+            "motor power while the app re-arms it.", "bad");
 }
 
 $("connect").onclick = function(){
   (async function(){
     try {
-      /* Connecting inhibits the motor for a few seconds - observed on a real
-         bike, and it happens with the manufacturer's own app too, so it is the
-         controller's behaviour rather than anything this app sends. Confirm
-         once per session rather than let someone tap it mid-ride. */
+      /* Connecting inhibits the motor until the connect sequence re-enables
+         it. Confirm once per session rather than let someone tap Connect
+         mid-ride and lose assist at a junction. */
       if (!connectWarned){
         connectWarned = true;
-        setStatus("<b>Are you stopped?</b> Connecting cuts motor power for a few " +
-                  "seconds. Tap Connect again to go ahead.", "bad");
+        setStatus("<b>Are you stopped?</b> Connecting interrupts motor power " +
+                  "briefly. Tap Connect again to go ahead.", "bad");
         return;
       }
       setStatus("Choose your bike in the Bluetooth list&hellip;");
@@ -1164,8 +1190,11 @@ async function connect(){
   /* The original app sends these two zero-payload requests on every connect.
      They are almost certainly what makes the bike report its model and
      firmware - packets the app can parse but we had never triggered. */
-  queueCmd(CMD.REQ_A);
+  queueCmd(CMD.MOTOR_ON);
   queueCmd(CMD.REQ_B);
+  queueCmd(CMD.REQ_A);
+  queueCmd(MODE_CMD[0x00]);
+  queueCmd(MODE_CMD[0x01]);
 
   document.body.classList.add("connected");
   setConn("live", "live");
@@ -1230,6 +1259,7 @@ $("unit").onclick = function(){
   renderTrip();
 };
 
+$("motorTile").onclick = toggleMotor;
 $("lampTile").onclick = toggleLamp;
 $("walkTile").onclick = tapWalk;
 for (var lv = 0; lv <= 3; lv++){
