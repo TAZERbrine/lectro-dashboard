@@ -99,10 +99,78 @@ ASCII model codes from bytes 4-6 (`c3i`, `c5i`, `C5i E`, `C6i E`, `C8i`,
 packet has ever been seen from this bike - earlier "version packet: 128.0.0"
 log lines were misparsed fragments, not real packets.
 
+## Control commands
+
+**The bike does accept control commands.** The app contains 15 command strings,
+all of which validate against the same CRC-16/CCITT as the telemetry frames, so
+these are genuine and not guesses. They share the frame format:
+
+```
+46 | A | B | LEN | payload | CRC16-hi CRC16-lo
+```
+
+| Command | Payload | Meaning |
+|---------|---------|---------|
+| `46 11 10 00 3E 25` | - | status poll (the one already in use) |
+| `46 11 14 00 F2 E1` | - | request, sent once at connect - unidentified |
+| `46 11 15 00 C1 D0` | - | request, sent once at connect - unidentified |
+| `46 16 17 01 00 15 11` | `00` | binary toggle, off |
+| `46 16 17 01 01 05 30` | `01` | binary toggle, on |
+| `46 16 18 01 00 39 20` | `00` | mode: assist 0 |
+| `46 16 18 01 01 29 01` | `01` | mode: assist 1 |
+| `46 16 18 01 02 19 62` | `02` | mode: assist 2 |
+| `46 16 18 01 03 09 43` | `03` | mode: assist 3 |
+| `46 16 18 01 10 2B 11` | `10` | mode: walk |
+| `46 16 18 01 80 A8 A8` | `80` | mode: assist 0 + lamp |
+| `46 16 18 01 81 B8 89` | `81` | mode: assist 1 + lamp |
+| `46 16 18 01 82 88 EA` | `82` | mode: assist 2 + lamp |
+| `46 16 18 01 83 98 CB` | `83` | mode: assist 3 + lamp |
+| `46 16 18 01 90 BA 99` | `90` | mode: walk + lamp |
+
+### The 0x16 0x18 payload is a bitfield
+
+```
+bit 0x80 = front lamp on
+bit 0x10 = walk mode
+bits 0-3 = assist level (0..3)
+```
+
+Evidence: `BLEConnectionService.z` sends `...01 90` under the log label
+`WALK_LAMP` and `...01 10` under `WALK_LAMP_OFF` - the two differ by exactly
+`0x80`, and only by "LAMP" in the name. Builders `Lc/e/a/c/a;.T/P/Q/M/b0(Z)`
+each take a boolean and return the same payload with or without `0x80`; the
+boolean is `BLEConnectionService.g`, and `onMessageEvent` flips it with
+`g = !g` then re-sends the current mode, which is the lamp toggle.
+
+`BLEConnectionService.h` holds the assist level and selects the builder:
+h=0 -> `b0` (walk), h=1 -> `P`, h=2 -> `Q`, h=3 -> `M`, h=4 -> `T`.
+
+### How commands are sent
+
+Commands are queued on `BLEConnectionService.e` (a `ConcurrentLinkedQueue`).
+The polling thread drains one per tick, and falls back to the status poll when
+the queue is empty. Each command is queued **twice** in the original app,
+presumably for reliability against a dropped write.
+
+### UI mapping
+
+`DashboardActivity.onClick` posts EventBus codes that `onMessageEvent` turns
+into commands: TOGGLE_MOTOR -> event 11, TOGGLE_LAMP -> event 12, plus
+TOGGLE_ASSIST and TOGGLE_CRUISE. So the original app *did* ship these controls.
+
+### Not yet identified
+
+- `46 16 17` (the binary toggle) - sent during connect and in walk handling.
+  Candidates are motor enable/disable or cruise control.
+- `46 11 14` / `46 11 15` - zero-payload requests. Strong candidates for
+  "report model" and "report version", which would explain why the app has
+  model/version parsers that never fire here: **we have never sent the
+  requests that trigger them.**
+
 ## Open questions
 
-- **Can the bike be controlled?** Unresolved. The telemetry poll proves the bike
-  accepts writes, so other commands plausibly exist, but none have been found.
+- What `46 16 17` toggles, and whether `46 11 14` / `46 11 15` return the
+  model and version packets the app knows how to parse.
 - What `0x27` and `0x28` carry.
 - The controller reports voltage, never percent, so battery percentage is
   estimated from a Li-ion curve.
