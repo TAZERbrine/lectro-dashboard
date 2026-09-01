@@ -29,19 +29,25 @@
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   /* Depth in a monochrome scheme has to come from gradient, edge highlight and
      shadow rather than colour. --lift is the top edge catching the light. */
-  --face:linear-gradient(177deg,#17171b 0%,#0d0d0f 58%,#08080a 100%);
-  --lift:rgba(255,255,255,.07);
-  --shadow-1:0 2px 5px rgba(0,0,0,.55), 0 8px 22px rgba(0,0,0,.4);
-  --shadow-2:0 1px 3px rgba(0,0,0,.5);
+  --face:linear-gradient(176deg,#23232a 0%,#141418 34%,#0a0a0c 78%,#050506 100%);
+  --lift:rgba(255,255,255,.34);
+  --lift2:rgba(255,255,255,.10);
+  --sink:rgba(0,0,0,.9);
+  --drop:drop-shadow(0 1px 1px rgba(0,0,0,.9)) drop-shadow(0 8px 14px rgba(0,0,0,.7));
+  --well:inset 0 2px 5px rgba(0,0,0,.95), inset 0 -1px 0 rgba(255,255,255,.06);
+  --glow:rgba(255,255,255,.5);
 }
 :root[data-theme="day"]{
   --bg:#ffffff; --panel:#ffffff; --panel2:#f2f2f4; --line:#c9c9cf;
   --tx:#000000; --dim:#55555e; --faint:#9a9aa2; --track:#e2e2e6;
   --ink:#ffffff;
-  --face:linear-gradient(177deg,#ffffff 0%,#f7f8fa 60%,#eef0f4 100%);
-  --lift:rgba(255,255,255,.9);
-  --shadow-1:0 2px 5px rgba(0,0,0,.13), 0 8px 22px rgba(0,0,0,.10);
-  --shadow-2:0 1px 3px rgba(0,0,0,.12);
+  --face:linear-gradient(176deg,#ffffff 0%,#f4f5f8 40%,#e4e7ed 100%);
+  --lift:rgba(255,255,255,1);
+  --lift2:rgba(255,255,255,.7);
+  --sink:rgba(0,0,0,.28);
+  --drop:drop-shadow(0 1px 1px rgba(0,0,0,.16)) drop-shadow(0 8px 14px rgba(0,0,0,.16));
+  --well:inset 0 2px 5px rgba(0,0,0,.22), inset 0 -1px 0 rgba(255,255,255,.9);
+  --glow:rgba(0,0,0,.35);
 }
 /* Riding in real darkness: pure white on pure black dazzles and wrecks your
    night vision, so this pulls the whole scale down rather than inverting it. */
@@ -49,10 +55,13 @@
   --bg:#0a0a0c; --panel:#121214; --panel2:#171719; --line:#232327;
   --tx:#a8a8b0; --dim:#63636b; --faint:#3c3c43; --track:#1c1c1f;
   --ink:#0a0a0c;
-  --face:linear-gradient(177deg,#161619 0%,#111113 60%,#0d0d0f 100%);
-  --lift:rgba(255,255,255,.05);
-  --shadow-1:0 2px 5px rgba(0,0,0,.5), 0 8px 20px rgba(0,0,0,.35);
-  --shadow-2:0 1px 3px rgba(0,0,0,.45);
+  --face:linear-gradient(176deg,#1d1d22 0%,#131316 40%,#0c0c0e 100%);
+  --lift:rgba(255,255,255,.20);
+  --lift2:rgba(255,255,255,.07);
+  --sink:rgba(0,0,0,.8);
+  --drop:drop-shadow(0 1px 1px rgba(0,0,0,.8)) drop-shadow(0 7px 12px rgba(0,0,0,.55));
+  --well:inset 0 2px 5px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,255,255,.05);
+  --glow:rgba(255,255,255,.35);
 }
 @media (prefers-color-scheme: light){
   :root:not([data-theme="night"]):not([data-theme="day"]):not([data-theme="dim"]){
@@ -71,6 +80,10 @@ body{
   padding:max(8px,env(safe-area-inset-top)) 10px calc(20px + env(safe-area-inset-bottom));
   max-width:560px;margin-inline:auto;
 }
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(125% 70% at 50% -12%, var(--lift2), transparent 62%);
+}
 .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 @keyframes screenIn{from{opacity:0;transform:translateY(10px) scale(.985)}
                     to{opacity:1;transform:none}}
@@ -84,17 +97,23 @@ body{
 }
 
 /* chamfered panel with a true 1px edge */
+/* clip-path discards outer box-shadows, so the float has to come from
+   filter:drop-shadow and the bevel from INSET shadows, which survive it.
+   That is why the first depth pass was nearly invisible. */
 .panel{
   position:relative;background:var(--line);clip-path:var(--chamfer);
-  filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));
+  filter:var(--drop);
 }
 .panel::before{
   content:"";position:absolute;inset:1px;background:var(--face);
   clip-path:var(--chamfer);
+  box-shadow:inset 0 1px 0 var(--lift),
+             inset 0 2px 0 var(--lift2),
+             inset 0 -2px 6px var(--sink),
+             inset 0 18px 26px -20px rgba(255,255,255,.14);
 }
-/* a single lit pixel along the top edge - what actually sells the bevel */
 .panel::after{
-  content:"";position:absolute;left:14px;right:2px;top:1px;height:1px;
+  content:"";position:absolute;left:15px;right:2px;top:1px;height:1px;
   background:var(--lift);pointer-events:none;
 }
 .panel > *{position:relative;z-index:1}
@@ -129,9 +148,11 @@ header{display:flex;align-items:center;gap:9px;margin-bottom:8px}
 
 /* ---------------- buttons ---------------- */
 button{font-family:inherit}
-button,.chip{transition:transform .09s cubic-bezier(.4,0,.2,1), filter .15s}
-.primary:active,.sec:active,.iconbtn:active,.lvls button:active{transform:translateY(2px) scale(.985)}
-.chip.tap:active{transform:translateY(2px) scale(.98)}
+body{perspective:900px}
+button,.chip{transition:transform .1s cubic-bezier(.4,0,.2,1), filter .15s}
+.primary:active,.sec:active,.iconbtn:active,.lvls button:active{
+  transform:translateY(3px) rotateX(7deg) scale(.975);filter:brightness(.86)}
+.chip.tap:active{transform:translateY(3px) rotateX(8deg) scale(.97);filter:brightness(.88)}
 .primary{
   width:100%;border:0;cursor:pointer;background:var(--tx);color:var(--ink);
   font-family:var(--mono);font-size:13px;font-weight:800;letter-spacing:.2em;
@@ -174,13 +195,23 @@ body.connected #connect{
 
 /* ---------------- hero ---------------- */
 .hero{margin-bottom:7px;display:grid;place-items:center;padding:8px 8px 13px}
+.hero::before{box-shadow:inset 0 1px 0 var(--lift),inset 0 2px 0 var(--lift2),
+              inset 0 -3px 10px var(--sink),
+              inset 0 26px 40px -26px rgba(255,255,255,.16)}
+.gaugewell{
+  position:absolute;top:50%;left:50%;width:min(58vw,224px);aspect-ratio:1;
+  transform:translate(-50%,-54%);border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle at 50% 20%, var(--lift2), transparent 60%);
+  box-shadow:inset 0 2px 14px rgba(0,0,0,.85);
+}
 .gauge{width:min(45vw,174px);height:auto;display:block}
 .gauge .tick{stroke:var(--track);stroke-width:3.4}
-.gauge .tick.on{stroke:var(--tx);filter:drop-shadow(0 0 3px rgba(255,255,255,.55))}
+.gauge .tick.on{stroke:var(--tx);filter:drop-shadow(0 0 5px var(--glow))}
 .hero-c{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
 .speed-n{
   font-size:clamp(44px,14.5vw,66px);font-weight:800;line-height:.92;
-  letter-spacing:-.045em;text-shadow:0 0 26px rgba(255,255,255,.16);
+  letter-spacing:-.045em;
+  text-shadow:0 0 34px var(--glow), 0 2px 1px rgba(0,0,0,.75);
 }
 .unit{
   background:none;border:0;color:var(--dim);font-family:var(--mono);font-size:10px;
@@ -216,8 +247,10 @@ body.stale .chips{opacity:.28}
 
 /* battery: skewed cells, lit = solid */
 .cells{display:flex;gap:3px;margin:7px 0 8px;height:15px}
-.cells i{flex:1;background:var(--track);transform:skewX(-17deg);transition:background .3s}
-.cells i.on{background:var(--tx);box-shadow:0 0 8px rgba(255,255,255,.22)}
+.cells i{flex:1;background:var(--track);transform:skewX(-17deg);
+         transition:background .3s,box-shadow .3s;box-shadow:var(--well)}
+.cells i.on{background:var(--tx);
+            box-shadow:0 0 10px var(--glow), inset 0 1px 0 rgba(255,255,255,.85)}
 .cells i.warn{background:var(--dim)}
 .batsub{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .batsub .vv{font-size:14px;font-weight:800;margin-top:2px;letter-spacing:-.03em}
@@ -238,8 +271,10 @@ body.stale .chips{opacity:.28}
 
 /* assist: skewed bars */
 .segs{display:flex;gap:3px;margin-top:7px;height:7px}
-.segs i{flex:1;background:var(--track);transform:skewX(-17deg);transition:background .25s}
-.segs i.on{background:var(--tx);box-shadow:0 0 7px rgba(255,255,255,.25)}
+.segs i{flex:1;background:var(--track);transform:skewX(-17deg);
+        transition:background .25s,box-shadow .25s;box-shadow:var(--well)}
+.segs i.on{background:var(--tx);
+           box-shadow:0 0 9px var(--glow), inset 0 1px 0 rgba(255,255,255,.8)}
 
 /* assist level buttons */
 .lvls{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:7px}
@@ -248,10 +283,12 @@ body.stale .chips{opacity:.28}
   font-size:12px;font-weight:800;padding:7px 0;cursor:pointer;
   clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),
                     calc(100% - 5px) 100%,0 100%,0 5px);
-  transition:background .2s,color .2s;
+  transition:background .2s,color .2s,box-shadow .2s;
+  box-shadow:var(--well);
 }
 .lvls button.sel{background:var(--tx);color:var(--ink);
-                 box-shadow:0 0 10px rgba(255,255,255,.3)}
+  box-shadow:0 0 14px var(--glow), inset 0 1px 0 rgba(255,255,255,.9),
+             inset 0 -2px 4px rgba(0,0,0,.28);}
 .lvls button:disabled{opacity:.28;cursor:default}
 .instbtn{margin-bottom:11px}
 .homebat{margin-bottom:11px}
@@ -302,7 +339,7 @@ body.stale .chips{opacity:.28}
 .chip .cs{font-family:var(--mono);font-size:10.5px;font-weight:800;color:var(--faint);
           margin-top:2px;letter-spacing:.14em}
 .chip.on::before{background:var(--tx)}
-.chip.on{filter:drop-shadow(0 0 10px rgba(255,255,255,.28))}
+.chip.on{filter:var(--drop) drop-shadow(0 0 14px var(--glow))}
 .chip.on::after{opacity:0}
 .chip.on .ci{fill:var(--ink)}
 .chip.on .cl,.chip.on .cs{color:var(--ink)}
@@ -400,6 +437,7 @@ pre{
 <div id="scRide" hidden>
   <section class="hero panel">
     <div class="stale-tag">No data</div>
+    <div class="gaugewell"></div>
     <svg class="gauge" viewBox="0 0 220 220" aria-hidden="true"><g id="ticks"></g></svg>
     <div class="hero-c">
       <div class="speed-n num live-val" id="speed">--</div>
@@ -538,7 +576,7 @@ pre{
 <script>
 "use strict";
 
-var APP_VERSION = "v22";
+var APP_VERSION = "v23";
 
 /* ------------------------------------------------------------------
    Protocol recovered from the official HeroLectro app v3.0, then
