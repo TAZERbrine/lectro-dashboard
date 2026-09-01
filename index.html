@@ -352,13 +352,13 @@ pre{
   </div>
   <div class="chip panel" id="walkTile">
     <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5.5a2 2 0 1 0-2-2 2 2 0 0 0 2 2zM10 22l1.6-5.2-2-1.9-1.1 5.2-2-.4 1.6-7.4 2.4-2.3-.7-3-2.2 2.2-2.6-.5.4-2 1.7.3 3-3 2 .5 2.4 4.2 2.5.5-.4 2-3.4-.7 1.4 2.6L18 17l-1.7 1.2-3-3.2L12 22z"/></svg>
-    <div class="cl">Walk</div>
+    <div class="cl">Throttle</div>
     <div class="cs" id="walk">--</div>
   </div>
   <div class="chip panel" id="motorTile">
     <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 3.5a1.2 1.2 0 0 1 1.2 1.2v5.6a1.2 1.2 0 0 1-2.4 0V6.7A1.2 1.2 0 0 1 12 5.5zM7.5 7.8a1.1 1.1 0 0 1 .5 1.9 5.2 5.2 0 1 0 8 0 1.1 1.1 0 0 1 1.5-1.6 7.4 7.4 0 1 1-11 0 1.1 1.1 0 0 1 1-0.3z"/></svg>
     <div class="cl">Motor</div>
-    <div class="cs" id="motor">--</div>
+    <div class="cs" id="motor">ON</div>
   </div>
   <div class="chip panel" id="chgTile">
     <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
@@ -778,13 +778,18 @@ function parseFrame(f){
   if (t[0x21]) d.amps  = t[0x21][1] * 0.1;      // hi byte 0x80 = current flowing
   if (t[0x22]) d.volts = (t[0x22][0] * 256 + t[0x22][1]) * 0.01;
   if (t[0x23]) d.range = (t[0x23][0] * 256 + t[0x23][1]) * 0.1;
-  if (t[0x24]){                                  // confirmed against the bike
-    d.lamp = t[0x24][0] !== 0;
-    d.walk = t[0x24][1] !== 0;
-    d.gear = t[0x24][2];
+  if (t[0x24]){
+    /* byte1 is the THROTTLE, not walk mode: it stays 1 for as long as the
+       throttle is held. An earlier build labelled it "walk", which is why
+       twisting the throttle lit up a walk indicator. */
+    d.lamp  = t[0x24][0] !== 0;
+    d.throt = t[0x24][1] !== 0;
+    d.gear  = t[0x24][2];
   }
   if (t[0x26]) d.err   = t[0x26][0];             // 0 while healthy
-  if (t[0x27]) d.motor = t[0x27][0] !== 0;       // 0 = motor inhibited
+  /* 0x27 flickers between 00 and 01 with no rider input, so it is NOT a
+     reliable motor-enable state. Captured, not displayed as truth. */
+  if (t[0x27]) d.flag27 = t[0x27][0];
   return d;
 }
 
@@ -868,13 +873,13 @@ function sendMode(lamp, walk, assist){
 /* Enabling the motor is always allowed - a rider coasting with a dead motor
    should be able to bring it back. Disabling is blocked while moving, since
    cutting assist under way is exactly the hazard we are guarding against. */
+/* One-way on purpose. This used to toggle, driven by tag 0x27, and a tap
+   while 0x27 happened to read 01 sent MOTOR_OFF and killed the motor. There is
+   no trustworthy motor-state reading, so this only ever re-enables. */
 function toggleMotor(){
   if (!cmdsVerified || !(gatt && gatt.connected)) return;
-  if (bikeState.motor && bikeState.speed >= 0.5){
-    setStatus("Not while moving - stop before switching the motor off.", "bad");
-    return;
-  }
-  queueCmd(bikeState.motor ? CMD.MOTOR_OFF : CMD.MOTOR_ON);
+  queueCmd(CMD.MOTOR_ON);
+  setStatus("Motor re-enabled. If it still will not drive, raise the assist level.", "ok");
 }
 
 function toggleLamp(){
@@ -1014,16 +1019,14 @@ function render(d){
 
   if (d.lamp !== undefined) setChip("lampTile", "lamp", d.lamp);
   if (d.walk !== undefined) setChip("walkTile", "walk", d.walk);
-  if (d.motor !== undefined) setChip("motorTile", "motor", d.motor);
   setChip("chgTile", "chg", detectCharging(d.volts, d.speed));
 
   /* Track what the bike says so commands are always composed from its real
      state, and refresh the controls after setChip has rewritten classNames. */
   if (d.lamp  !== undefined) bikeState.lamp  = d.lamp;
-  if (d.walk  !== undefined) bikeState.walk  = d.walk;
+  if (d.throt !== undefined) bikeState.throt = d.throt;
   if (d.gear  !== undefined) bikeState.gear  = d.gear;
   if (d.speed !== undefined) bikeState.speed = d.speed;
-  if (d.motor !== undefined) bikeState.motor = d.motor;
   renderControls();
 
   /* Tag 0x26 is a single byte and reads 0 on a healthy bike, so it can be

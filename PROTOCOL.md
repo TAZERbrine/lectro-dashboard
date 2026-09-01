@@ -69,14 +69,28 @@ phantom "controller error 34": `0x22` is the voltage *tag byte*, and 34 is
 | `0x21` | 2 | current. High byte meaning UNKNOWN - see below | low byte x0.1 A |
 | `0x22` | 2 | pack voltage | x0.01 V |
 | `0x23` | 2 | remaining range | x0.1 km |
-| `0x24` | 3 | front lamp, walk mode, assist level | one byte each |
+| `0x24` | 3 | front lamp, **throttle held**, assist level | one byte each |
 | `0x26` | 1 | error code, `0` when healthy | raw |
-| `0x27` | 1 | motor inhibit: `00` = motor cut, `01` = ready | raw |
+| `0x27` | 1 | flickers `00`/`01` with no rider input - NOT reliable motor state | raw |
 | `0x28` | 4 | first byte crept 0x23 -> 0x24 while charging - unknown | raw |
 
-`0x24` confirmed empirically twice: a capture of the bike's light, walk mode and
-assist level being toggled shows exactly those three bytes stepping
-1/0 -> 0/0 -> walk 1 -> assist 1,2,3 -> 0.
+`0x24` byte 1 is the **throttle**, not walk mode. In a throttle test it held `1`
+for six continuous seconds while the throttle was twisted, and an earlier build
+that labelled it "walk" made twisting the throttle light up a walk indicator.
+Bytes 0 and 2 (lamp, assist level) are confirmed by toggling each on the bike
+and watching only that byte change.
+
+An earlier reading of `0x27` as a motor-inhibit flag was **wrong**. It was based
+on a single window where it happened to read `00` during a motor cut; a longer
+capture shows it flickering `01/00/01/00` with the bike stationary and untouched.
+Its meaning is unknown.
+
+### Assist 0 disables the motor entirely
+
+With `0x24` byte 2 at `0`, the controller will not drive - throttle included.
+A capture of the throttle held for six seconds at assist 0 shows speed pinned at
+0.0 km/h and current never rising above 1.0 A, which is just the electronics.
+Any client that wants the motor to work must set an assist level of 1 or higher.
 
 ## Charging is not directly reported
 
