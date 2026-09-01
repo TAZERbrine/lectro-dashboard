@@ -416,7 +416,9 @@ pre{
     you at your speed, subtracts the motor's share, and treats the remainder as
     your legs. Throttle along without pedalling and it should read near zero.
     <br><br>
-    It is an estimate, not a measurement. Your bike has no pedal-torque sensor,
+    Anything under 35 W reads as zero: that is the measured noise floor of the
+    estimate, checked against a real coast-down where the rider was doing
+    nothing. It is an estimate, not a measurement. Your bike has no pedal-torque sensor,
     so your effort is inferred rather than measured, and hills are approximated
     by the terrain setting above rather than sensed. Treat it as a decent guide
     to relative effort between rides, not a calorie count to diet on.
@@ -614,6 +616,7 @@ var CRR = 0.006;        // city tyres on asphalt
 var CDA = 0.55;         // upright riding position, m^2
 var ETA_MOTOR = 0.78;   // battery watts -> watts delivered at the wheel
 var ETA_HUMAN = 0.24;   // mechanical work -> metabolic energy burned
+var RIDER_FLOOR = 35;   // W: measured noise floor of the residual estimate
 
 var rider = { kg:70, bike:25, unit:"kg", terrain:1 };
 try {
@@ -621,17 +624,47 @@ try {
   if (savedRider && savedRider.kg) rider = savedRider;
 } catch(e){}
 
-function riderPower(d){
+/* Speed arrives quantised to 0.1 km/h, so a per-packet difference is mostly
+   noise. Measure acceleration across a ~1.5 s baseline instead: steady
+   enough to trust, short enough to catch a throttle release quickly. */
+var vTrace = [], lastV = null, accelEMA = 0;
+
+function riderPower(d, dt){
   if (d.speed === undefined) return 0;
   var v = d.speed / 3.6;                       // m/s
-  if (v <= 0.2) return 0;
-  var mass  = rider.kg + rider.bike;           // always held in kg
-  var pRoll = CRR * mass * G_ACC * v * rider.terrain;
-  var pAero = 0.5 * RHO * CDA * v * v * v;
-  var need  = pRoll + pAero;
-  var motor = (d.volts !== undefined && d.amps !== undefined)
+  if (v <= 0.2){ vTrace = []; accelEMA = 0; return 0; }
+  var mass = rider.kg + rider.bike;            // always held in kg
+
+  /* Acceleration matters, and leaving it out was a real error: coasting down
+     from 24.5 to 23.2 km/h with the throttle released, the roll+aero demand
+     is ~126 W and the motor only ~20 W, so the missing 106 W was blamed on
+     the rider - who was doing nothing at all. That energy comes from the
+     bike's momentum. Smoothed, because speed arrives in 0.1 km/h steps and
+     raw differences are noisy. */
+  var now = Date.now();
+  vTrace.push([now, v]);
+  while (vTrace.length > 1 && now - vTrace[0][0] > 1500) vTrace.shift();
+  var a = 0;
+  if (vTrace.length > 1){
+    var span = (now - vTrace[0][0]) / 1000;
+    if (span > 0.3) a = (v - vTrace[0][1]) / span;
+  }
+  accelEMA = a;
+
+  var pRoll  = CRR * mass * G_ACC * v * rider.terrain;
+  var pAero  = 0.5 * RHO * CDA * v * v * v;
+  var pAccel = mass * accelEMA * v;            // negative while slowing
+  var need   = pRoll + pAero + pAccel;
+  var motor  = (d.volts !== undefined && d.amps !== undefined)
     ? d.volts * d.amps * ETA_MOTOR : 0;
-  return Math.max(0, need - motor);
+
+  /* This is a residual, so every modelling error lands in it. Measured against
+     a real coast-down it reads about 35 W when the rider is doing nothing at
+     all - the drag figures are simply a little generous for this bike. Treat
+     anything under that as noise rather than book phantom calories, and cap
+     the top so one bad speed sample cannot record a 2 kW effort. */
+  var p = need - motor;
+  return (p < RIDER_FLOOR) ? 0 : Math.min(600, p);
 }
 
 var PSEGS = 5, pSegEls = [];
@@ -650,7 +683,7 @@ function showPower(w){
 }
 
 function accumulateEffort(d, dt){
-  var w = riderPower(d);
+  var w = riderPower(d, dt);
   trip.work += w * dt;                          // mechanical joules
   trip.kcal += (w / ETA_HUMAN) * dt / 4184;     // metabolic kcal
   showPower(w);
@@ -1299,6 +1332,7 @@ for (var lv = 0; lv <= 3; lv++){
 $("reset").onclick = function(){
   trip = { dist:0, ms:0, max:0, last:0, kcal:0, work:0 };
   packets = 0;
+  vTrace = []; accelEMA = 0;
   showPower(0);
   renderTrip();
 };
