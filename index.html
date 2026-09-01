@@ -12,6 +12,18 @@
 <link rel="apple-touch-icon" href="./icon-192.png">
 <title>Lectro Dashboard</title>
 <style>
+/* Chakra Petch, self-hosted so it works offline and needs no CDN. Its
+   letterforms have clipped corners, which is the same geometry as the
+   chamfered panels - the labels and the chrome finally agree. Open Font
+   License. Latin subset only: three weights, about 10KB each. */
+@font-face{font-family:"Chakra";src:url(./cp-500.woff2) format("woff2");
+           font-weight:500;font-display:swap}
+@font-face{font-family:"Chakra";src:url(./cp-600.woff2) format("woff2");
+           font-weight:600;font-display:swap}
+@font-face{font-family:"Chakra";src:url(./cp-700.woff2) format("woff2");
+           font-weight:700;font-display:swap}
+</style>
+<style>
 /* ============================================================
    Monochrome instrument panel. No colour anywhere, so state is
    carried by fill vs outline and by brightness instead:
@@ -26,6 +38,7 @@
                     calc(100% - 13px) 100%, 0 100%, 0 13px);
   --chamfer-sm:polygon(9px 0, 100% 0, 100% calc(100% - 9px),
                        calc(100% - 9px) 100%, 0 100%, 0 9px);
+  --ui:"Chakra",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   /* Depth in a monochrome scheme has to come from gradient, edge highlight and
      shadow rather than colour. --lift is the top edge catching the light. */
@@ -75,7 +88,7 @@
 html{-webkit-text-size-adjust:100%}
 body{
   margin:0;background:var(--bg);color:var(--tx);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  font-family:var(--ui);
   line-height:1.4;-webkit-tap-highlight-color:transparent;
   padding:max(8px,env(safe-area-inset-top)) 10px calc(20px + env(safe-area-inset-bottom));
   max-width:560px;margin-inline:auto;
@@ -122,7 +135,7 @@ body::before{
 header{display:flex;align-items:center;gap:9px;margin-bottom:8px}
 .brand{
   display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;
-  letter-spacing:.26em;text-transform:uppercase;font-family:var(--mono);
+  letter-spacing:.26em;text-transform:uppercase;font-family:var(--ui);
 }
 .brand .mk{
   width:15px;height:15px;background:var(--tx);flex:none;
@@ -130,7 +143,7 @@ header{display:flex;align-items:center;gap:9px;margin-bottom:8px}
 }
 .spacer{flex:1}
 .pill{
-  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.18em;
+  font-family:var(--ui);font-size:10px;font-weight:700;letter-spacing:.18em;
   text-transform:uppercase;padding:6px 10px;color:var(--dim);
   background:var(--panel2);clip-path:var(--chamfer-sm);display:inline-flex;
   align-items:center;gap:7px;white-space:nowrap;
@@ -141,7 +154,7 @@ header{display:flex;align-items:center;gap:9px;margin-bottom:8px}
 @keyframes blink{50%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.pill.live .dot{animation:none}}
 .iconbtn{
-  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.18em;
+  font-family:var(--ui);font-size:10px;font-weight:700;letter-spacing:.18em;
   padding:6px 10px;color:var(--tx);background:var(--panel2);border:0;
   clip-path:var(--chamfer-sm);cursor:pointer;
 }
@@ -155,7 +168,7 @@ button,.chip{transition:transform .1s cubic-bezier(.4,0,.2,1), filter .15s}
 .chip.tap:active{transform:translateY(3px) rotateX(8deg) scale(.97);filter:brightness(.88)}
 .primary{
   width:100%;border:0;cursor:pointer;background:var(--tx);color:var(--ink);
-  font-family:var(--mono);font-size:13px;font-weight:800;letter-spacing:.2em;
+  font-family:var(--ui);font-size:13px;font-weight:800;letter-spacing:.2em;
   text-transform:uppercase;padding:16px;clip-path:var(--chamfer);margin-bottom:11px;
   box-shadow:var(--shadow-1);
 }
@@ -167,7 +180,7 @@ body.connected #connect{
 }
 .sec{
   width:100%;border:0;cursor:pointer;background:var(--panel2);color:var(--tx);
-  font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.16em;
+  font-family:var(--ui);font-size:10.5px;font-weight:700;letter-spacing:.16em;
   text-transform:uppercase;padding:11px 8px;clip-path:var(--chamfer-sm);
 }
 
@@ -181,20 +194,20 @@ body.connected #connect{
 .status.bad{background:var(--tx);color:var(--ink);font-weight:700}
 .alert{
   background:var(--tx);color:var(--ink);padding:12px 14px;margin-bottom:11px;
-  font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.1em;
+  font-family:var(--ui);font-size:12px;font-weight:800;letter-spacing:.1em;
   text-transform:uppercase;clip-path:var(--chamfer-sm);
 }
 
 /* ---------------- labels ---------------- */
 .k,.kk,.cl,.tk{
-  font-family:var(--mono);color:var(--dim);text-transform:uppercase;font-weight:700;
+  font-family:var(--ui);color:var(--dim);text-transform:uppercase;font-weight:600;
 }
-.k{font-size:9.5px;letter-spacing:.22em}
-.kk,.tk{font-size:8.5px;letter-spacing:.18em}
-.cl{font-size:8px;letter-spacing:.1em}
+.k{font-size:10px;letter-spacing:.16em}
+.kk,.tk{font-size:9.5px;letter-spacing:.11em}
+.cl{font-size:9.5px;letter-spacing:.1em}
 
 /* ---------------- hero ---------------- */
-.hero{margin-bottom:7px;display:grid;place-items:center;padding:8px 8px 13px}
+.hero{margin-bottom:7px;display:grid;place-items:center;padding:6px 8px 12px}
 .hero::before{box-shadow:inset 0 1px 0 var(--lift),inset 0 2px 0 var(--lift2),
               inset 0 -3px 10px var(--sink),
               inset 0 26px 40px -26px rgba(255,255,255,.16)}
@@ -214,17 +227,17 @@ body.connected #connect{
   text-shadow:0 0 34px var(--glow), 0 2px 1px rgba(0,0,0,.75);
 }
 .unit{
-  background:none;border:0;color:var(--dim);font-family:var(--mono);font-size:10px;
+  background:none;border:0;color:var(--dim);font-family:var(--ui);font-size:10px;
   font-weight:700;letter-spacing:.3em;text-transform:uppercase;cursor:pointer;
   padding:3px 8px;margin-top:2px;
 }
 .scale{
   position:absolute;bottom:6px;left:0;right:0;text-align:center;
-  font-family:var(--mono);font-size:8px;color:var(--faint);letter-spacing:.2em;
+  font-family:var(--ui);font-size:8px;color:var(--faint);letter-spacing:.2em;
 }
 .stale-tag{
   position:absolute;top:14px;left:50%;transform:translateX(-50%);display:none;
-  font-family:var(--mono);font-size:9px;font-weight:800;letter-spacing:.24em;
+  font-family:var(--ui);font-size:9px;font-weight:800;letter-spacing:.24em;
   text-transform:uppercase;color:var(--ink);background:var(--tx);padding:4px 10px;
   clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
 }
@@ -239,10 +252,10 @@ body.stale .chips{opacity:.28}
 
 /* ---------------- cards ---------------- */
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}
-.card{padding:10px 12px;min-width:0}
+.card{padding:9px 12px;min-width:0}
 .card.wide{grid-column:1 / -1}
 .v{font-size:23px;font-weight:800;line-height:1.1;margin-top:3px;letter-spacing:-.03em}
-.v .su{font-family:var(--mono);font-size:10px;color:var(--dim);font-weight:700;
+.v .su{font-family:var(--ui);font-size:10px;color:var(--dim);font-weight:700;
        margin-left:4px;letter-spacing:.1em}
 
 /* battery: skewed cells, lit = solid */
@@ -254,7 +267,7 @@ body.stale .chips{opacity:.28}
 .cells i.warn{background:var(--dim)}
 .batsub{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .batsub .vv{font-size:14px;font-weight:800;margin-top:2px;letter-spacing:-.03em}
-.batsub .vv .su{font-family:var(--mono);font-size:8.5px;color:var(--dim);
+.batsub .vv .su{font-family:var(--ui);font-size:8.5px;color:var(--dim);
                 margin-left:1px;font-weight:700}
 
 /* rider setup */
@@ -263,7 +276,7 @@ body.stale .chips{opacity:.28}
 .setup .kk{margin-bottom:5px}
 .setup input,.setup select{
   width:100%;background:var(--panel2);color:var(--tx);border:1px solid var(--line);
-  font-family:var(--mono);font-size:14px;font-weight:700;padding:10px;
+  font-family:var(--ui);font-size:14px;font-weight:700;padding:10px;
   -webkit-appearance:none;appearance:none;border-radius:0;
 }
 .setup select{background-image:none}
@@ -279,7 +292,7 @@ body.stale .chips{opacity:.28}
 /* assist level buttons */
 .lvls{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:7px}
 .lvls button{
-  border:0;background:var(--panel2);color:var(--dim);font-family:var(--mono);
+  border:0;background:var(--panel2);color:var(--dim);font-family:var(--ui);
   font-size:12px;font-weight:800;padding:7px 0;cursor:pointer;
   clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),
                     calc(100% - 5px) 100%,0 100%,0 5px);
@@ -293,7 +306,7 @@ body.stale .chips{opacity:.28}
 .instbtn{margin-bottom:11px}
 .homebat{margin-bottom:11px}
 .bigpct{font-size:44px;font-weight:800;letter-spacing:-.04em;line-height:1;margin:10px 0 12px}
-.bigpct .su{font-family:var(--mono);font-size:14px;color:var(--dim);font-weight:700;margin-left:4px}
+.bigpct .su{font-family:var(--ui);font-size:14px;color:var(--dim);font-weight:700;margin-left:4px}
 .batsub.b3{grid-template-columns:repeat(3,1fr)}
 
 /* past rides */
@@ -301,22 +314,22 @@ body.stale .chips{opacity:.28}
   display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:baseline;
   padding:12px 14px;margin-bottom:7px;
 }
-.ride .when{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.12em;
+.ride .when{font-family:var(--ui);font-size:10px;color:var(--dim);letter-spacing:.12em;
             text-transform:uppercase}
 .ride .dist{font-size:20px;font-weight:800;letter-spacing:-.03em;text-align:right}
-.ride .dist .su{font-family:var(--mono);font-size:9px;color:var(--dim);margin-left:2px}
-.ride .det{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.06em}
+.ride .dist .su{font-family:var(--ui);font-size:9px;color:var(--dim);margin-left:2px}
+.ride .det{font-family:var(--ui);font-size:10.5px;color:var(--dim);letter-spacing:.06em}
 .ride .det b{color:var(--tx);font-weight:700}
 .empty{
-  font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.12em;
+  font-family:var(--ui);font-size:10.5px;color:var(--dim);letter-spacing:.12em;
   text-transform:uppercase;text-align:center;padding:20px 10px;
 }
 .totals{
-  font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.12em;
+  font-family:var(--ui);font-size:10px;color:var(--dim);letter-spacing:.12em;
   text-transform:uppercase;text-align:center;margin-top:11px;
 }
 .ctlnote{
-  font-family:var(--mono);font-size:9.5px;color:var(--faint);letter-spacing:.12em;
+  font-family:var(--ui);font-size:9.5px;color:var(--faint);letter-spacing:.12em;
   text-transform:uppercase;margin:-1px 0 7px;text-align:center;min-height:0;
 }
 .chip.tap{cursor:pointer}
@@ -331,12 +344,12 @@ body.stale .chips{opacity:.28}
 /* state chips: filled when active, outline when not */
 .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:9px}
 .chips.two{grid-template-columns:repeat(2,1fr);gap:7px}
-.chips.two .chip{padding:9px 6px}
-.chips.two .cl{font-size:8.5px;letter-spacing:.16em}
+.chips.two .chip{padding:8px 6px}
+.chips.two .cl{font-size:10px;letter-spacing:.12em}
 .chip{padding:11px 4px;text-align:center}
 .chip .ci{width:17px;height:17px;margin:0 auto 4px;display:block;fill:var(--faint);
           transition:fill .25s}
-.chip .cs{font-family:var(--mono);font-size:10.5px;font-weight:800;color:var(--faint);
+.chip .cs{font-family:var(--ui);font-size:10.5px;font-weight:800;color:var(--faint);
           margin-top:2px;letter-spacing:.14em}
 .chip.on::before{background:var(--tx)}
 .chip.on{filter:var(--drop) drop-shadow(0 0 14px var(--glow))}
@@ -346,15 +359,15 @@ body.stale .chips{opacity:.28}
 
 /* ---------------- trip ---------------- */
 h2{
-  font-family:var(--mono);font-size:9px;color:var(--dim);text-transform:uppercase;
-  letter-spacing:.28em;margin:11px 0 7px;font-weight:700;
+  font-family:var(--ui);font-size:9px;color:var(--dim);text-transform:uppercase;
+  letter-spacing:.24em;margin:9px 0 6px;font-weight:700;
 }
 /* Same chamfered panels as every other card, rather than the flat 1px grid it
    used to be, so the ride stats read as part of the same instrument. */
 .trip{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px}
-.trip > .panel{padding:8px 4px;text-align:center;min-width:0}
+.trip > .panel{padding:7px 4px;text-align:center;min-width:0}
 .trip .tv{font-size:15px;font-weight:800;margin-top:2px;letter-spacing:-.03em}
-.trip .tv .su{font-family:var(--mono);font-size:9px;color:var(--dim);font-weight:700}
+.trip .tv .su{font-family:var(--ui);font-size:9px;color:var(--dim);font-weight:700}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
 .sec.armed{background:var(--tx);color:var(--ink)}
@@ -362,7 +375,7 @@ h2{
 
 /* ---------------- diagnostics ---------------- */
 details{padding:13px 14px;margin-top:11px}
-summary{cursor:pointer;color:var(--dim);font-family:var(--mono);font-size:10px;
+summary{cursor:pointer;color:var(--dim);font-family:var(--ui);font-size:10px;
         font-weight:700;letter-spacing:.18em;text-transform:uppercase}
 .meta{font-size:11.5px;color:var(--dim);margin-top:10px}
 .mono{font-family:var(--mono);font-size:10.5px}
@@ -374,7 +387,7 @@ pre{
   font-family:var(--mono);white-space:pre;color:var(--dim);
 }
 .foot{
-  color:var(--faint);font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+  color:var(--faint);font-family:var(--ui);font-size:10px;letter-spacing:.12em;
   text-transform:uppercase;margin-top:18px;text-align:center;line-height:2;
 }
 
@@ -576,7 +589,7 @@ pre{
 <script>
 "use strict";
 
-var APP_VERSION = "v23";
+var APP_VERSION = "v24";
 
 /* ------------------------------------------------------------------
    Protocol recovered from the official HeroLectro app v3.0, then

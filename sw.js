@@ -9,14 +9,17 @@
    Fetches are served cache-first, and the browser only looks for a new service
    worker when THIS FILE's bytes change. Ship a new index.html without touching
    this line and everyone already installed keeps the old version forever. */
-var CACHE = "lectro-v23";
+var CACHE = "lectro-v24";
 
 var FILES = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./icon-192.png",
-  "./icon-512.png"
+  "./icon-512.png",
+  "./cp-500.woff2",
+  "./cp-600.woff2",
+  "./cp-700.woff2"
 ];
 
 self.addEventListener("install", function(e){
