@@ -9,7 +9,7 @@
    Fetches are served cache-first, and the browser only looks for a new service
    worker when THIS FILE's bytes change. Ship a new index.html without touching
    this line and everyone already installed keeps the old version forever. */
-var CACHE = "lectro-v19";
+var CACHE = "lectro-v20";
 
 var FILES = [
   "./",
@@ -24,8 +24,13 @@ self.addEventListener("install", function(e){
   e.waitUntil(
     caches.open(CACHE).then(function(c){
       // Don't let one missing file abort the whole install.
+      /* {cache:"reload"} is essential. cache.add() otherwise goes through the
+         browser's HTTP cache, and GitHub Pages sends max-age=600 - so a newly
+         installed worker would re-fetch index.html, be handed the 10-minute-old
+         copy, and store the previous version under the new cache name. New
+         cache, stale contents, and the app appears frozen on an old build. */
       return Promise.all(FILES.map(function(f){
-        return c.add(f).catch(function(){});
+        return c.add(new Request(f, {cache: "reload"})).catch(function(){});
       }));
     })
   );

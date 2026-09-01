@@ -497,7 +497,7 @@ pre{
 <script>
 "use strict";
 
-var APP_VERSION = "v19";
+var APP_VERSION = "v20";
 
 /* ------------------------------------------------------------------
    Protocol recovered from the official HeroLectro app v3.0, then
@@ -1593,7 +1593,10 @@ renderInfo();
    has, so wherever one works the other does too. */
 if ("serviceWorker" in navigator){
   window.addEventListener("load", function(){
-    navigator.serviceWorker.register("./sw.js").catch(function(){
+    navigator.serviceWorker.getRegistration().then(function(r){
+      if (r) r.update();          // ask on every launch, do not wait 24h
+    }).catch(function(){});
+    navigator.serviceWorker.register("./sw.js", {updateViaCache:"none"}).catch(function(){
       /* not fatal - the dashboard still works, just not offline */
     });
   });
