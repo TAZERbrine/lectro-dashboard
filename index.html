@@ -835,6 +835,7 @@ var cmdsVerified = false;
    drift out of sync with the handlebar controls. */
 var bikeState = { lamp:false, walk:false, gear:0, speed:0 };
 var walkArmed = false;
+var connectWarned = false;   // one-time 'are you stopped?' gate on Connect
 
 function motorControlsAllowed(){
   return cmdsVerified && !!(gatt && gatt.connected) && bikeState.speed < 0.5;
@@ -1076,12 +1077,24 @@ if (!navigator.bluetooth){
             "on Android or Windows (on iPhone use the <b>Bluefy</b> browser app).", "bad");
   $("connect").disabled = true;
 } else {
-  setStatus("Turn the bike on, keep the phone near it, then tap Connect.");
+  setStatus("<b>Do not connect while riding.</b> Connecting cuts motor power for " +
+            "a few seconds - the bike does this itself, with any app. Stop first, " +
+            "then connect.", "bad");
 }
 
 $("connect").onclick = function(){
   (async function(){
     try {
+      /* Connecting inhibits the motor for a few seconds - observed on a real
+         bike, and it happens with the manufacturer's own app too, so it is the
+         controller's behaviour rather than anything this app sends. Confirm
+         once per session rather than let someone tap it mid-ride. */
+      if (!connectWarned){
+        connectWarned = true;
+        setStatus("<b>Are you stopped?</b> Connecting cuts motor power for a few " +
+                  "seconds. Tap Connect again to go ahead.", "bad");
+        return;
+      }
       setStatus("Choose your bike in the Bluetooth list&hellip;");
       device = await navigator.bluetooth.requestDevice({
         filters: [{ services: [SVC] }],

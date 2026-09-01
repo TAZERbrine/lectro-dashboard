@@ -66,12 +66,12 @@ phantom "controller error 34": `0x22` is the voltage *tag byte*, and 34 is
 | Tag    | Bytes | Meaning | Scale |
 |--------|-------|---------|-------|
 | `0x20` | 2 | speed | x0.1 km/h |
-| `0x21` | 2 | current - high byte is `0x80` while current flows, `0x00` at exactly zero | low byte x0.1 A |
+| `0x21` | 2 | current. High byte meaning UNKNOWN - see below | low byte x0.1 A |
 | `0x22` | 2 | pack voltage | x0.01 V |
 | `0x23` | 2 | remaining range | x0.1 km |
 | `0x24` | 3 | front lamp, walk mode, assist level | one byte each |
 | `0x26` | 1 | error code, `0` when healthy | raw |
-| `0x27` | 1 | constant `01` in every capture - unknown | raw |
+| `0x27` | 1 | motor inhibit: `00` = motor cut, `01` = ready | raw |
 | `0x28` | 4 | first byte crept 0x23 -> 0x24 while charging - unknown | raw |
 
 `0x24` confirmed empirically twice: a capture of the bike's light, walk mode and
@@ -80,9 +80,11 @@ assist level being toggled shows exactly those three bytes stepping
 
 ## Charging is not directly reported
 
-Tag `0x21`'s high byte is `0x80` whenever current flows and `0x00` at exactly
-zero current, and it stays `0x80` with the charger plugged in, so it is **not**
-a charge/discharge flag - the original app's `batteryCurrentPostiveNegative`
+The high byte of tag `0x21` is **not understood**. An early guess that `0x80`
+meant "current is flowing" was disproved by a capture where the largest current
+in the whole log, 2.7 A under motor load, carried high byte `0x00` while every
+idle 0.5-0.7 A sample carried `0x80`. It stays `0x80` with the charger plugged
+in, so it is certainly **not** a charge/discharge flag - the original app's `batteryCurrentPostiveNegative`
 field name is misleading. Current stays at 0.2-1.2 A, which is the controller's
 own electronics; the charger feeds the pack directly and bypasses the shunt, so
 charge current never appears.
@@ -90,6 +92,28 @@ charge current never appears.
 Charging *is* detectable indirectly: pack voltage climbing steadily while the
 bike is stationary. A real capture showed 33.92 -> 33.93 -> 33.95 V with range
 14.0 -> 14.4 km over about 45 seconds.
+
+## Connecting cuts motor power
+
+**Opening a BLE connection inhibits the motor for a few seconds.** This is the
+controller's own behaviour - it happens with the manufacturer's app too, so it
+is not caused by anything a client sends.
+
+Captured while holding the throttle at a steady 11.2 km/h and then connecting:
+
+| time | speed km/h | current | `0x27` |
+|------|-----------|---------|--------|
+| connect | 11.2 | **2.7 A** | `00` |
+| +0.5s | 11.0 | 0.5 A | `00` |
+| +1s | 9.7 | 0.7 A | `00` |
+| +2s | 8.0 | 0.5 A | `00` |
+| +3s | 5.9 | 0.7 A | `00` |
+| +4s | 5.9 | 0.7 A | **`01`** |
+
+Motor current collapses from 2.7 A to idle immediately, the bike coasts down,
+and `0x27` returns to `01` after roughly four seconds. That is what identifies
+`0x27` as a motor-inhibit flag, and it is why the app refuses to connect
+without a confirming second tap.
 
 ## Model and version packets
 
