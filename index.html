@@ -460,7 +460,7 @@ pre{
     </div>
     <div class="chip panel" id="walkTile">
       <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5.5a2 2 0 1 0-2-2 2 2 0 0 0 2 2zM10 22l1.6-5.2-2-1.9-1.1 5.2-2-.4 1.6-7.4 2.4-2.3-.7-3-2.2 2.2-2.6-.5.4-2 1.7.3 3-3 2 .5 2.4 4.2 2.5.5-.4 2-3.4-.7 1.4 2.6L18 17l-1.7 1.2-3-3.2L12 22z"/></svg>
-      <div class="cl">Hold to walk</div>
+      <div class="cl">Walk</div>
       <div class="cs" id="walk">--</div>
     </div>
   </div>
@@ -538,7 +538,7 @@ pre{
 <script>
 "use strict";
 
-var APP_VERSION = "v21";
+var APP_VERSION = "v22";
 
 /* ------------------------------------------------------------------
    Protocol recovered from the official HeroLectro app v3.0, then
@@ -1083,13 +1083,17 @@ function setAssist(n){
   sendMode(bikeState.lamp, false, n);
 }
 
-/* Walk is hold-to-walk, like the button on the bike itself: it runs while you
-   hold it and stops the moment you let go. The previous two-tap confirm was
-   worse in every way - the first tap only armed it, so a single press blinked
-   and timed out without ever engaging, and a mode that drives the bike should
-   not stay latched on after your finger leaves. Holding also re-asserts the
-   command, which matters if the controller expects it repeated. */
+/* Walk toggles: one tap on, one tap off. While it is on the command is
+   re-asserted every 600ms, which covers the controller expecting it repeated.
+   Since it stays on without a finger on the screen, it is cut automatically on
+   disconnect and on leaving the ride screen, so it cannot be left running by
+   walking away from the app. */
 var walkTimer = null, walking = false;
+
+function toggleWalk(){
+  if (walking){ walkStop(); return; }
+  walkStart();
+}
 
 function walkStart(){
   if (walking) return;
@@ -1481,14 +1485,7 @@ $("unit").onclick = function(){
   renderRides();
 };
 
-(function(){
-  var w = $("walkTile");
-  w.addEventListener("pointerdown", function(e){ e.preventDefault(); walkStart(); });
-  ["pointerup","pointercancel","pointerleave"].forEach(function(ev){
-    w.addEventListener(ev, walkStop);
-  });
-  w.addEventListener("contextmenu", function(e){ e.preventDefault(); });
-})();
+$("walkTile").onclick = toggleWalk;
 $("lampTile").onclick = toggleLamp;
 for (var lv = 0; lv <= 3; lv++){
   (function(n){ $("lvl" + n).onclick = function(){ setAssist(n); }; })(lv);
@@ -1580,6 +1577,7 @@ function renderRides(){
 }
 
 function showScreen(name){
+  if (name !== "ride") walkStop();   // never leave walk running behind you
   $("scHome").hidden = (name !== "home");
   $("scRide").hidden = (name !== "ride");
   if (name === "home") renderRides();
