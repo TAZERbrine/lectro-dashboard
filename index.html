@@ -101,7 +101,9 @@ button{font-family:inherit}
   text-transform:uppercase;padding:16px;clip-path:var(--chamfer);margin-bottom:11px;
 }
 .primary:disabled{opacity:.4}
-body.connected .primary{
+/* Scoped to Connect only. As a bare .primary this also greyed out START RIDE,
+   which is the main action on the home screen once you are connected. */
+body.connected #connect{
   background:var(--panel2);color:var(--dim);padding:11px;font-size:10px;
 }
 .sec{
@@ -212,6 +214,30 @@ body.stale .chips{opacity:.28}
 }
 .lvls button.sel{background:var(--tx);color:var(--ink)}
 .lvls button:disabled{opacity:.28;cursor:default}
+.homebat{margin-bottom:11px}
+.bigpct{font-size:44px;font-weight:800;letter-spacing:-.04em;line-height:1;margin:10px 0 12px}
+.bigpct .su{font-family:var(--mono);font-size:14px;color:var(--dim);font-weight:700;margin-left:4px}
+.batsub.b3{grid-template-columns:repeat(3,1fr)}
+
+/* past rides */
+.ride{
+  display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:baseline;
+  padding:12px 14px;margin-bottom:7px;
+}
+.ride .when{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.12em;
+            text-transform:uppercase}
+.ride .dist{font-size:20px;font-weight:800;letter-spacing:-.03em;text-align:right}
+.ride .dist .su{font-family:var(--mono);font-size:9px;color:var(--dim);margin-left:2px}
+.ride .det{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.06em}
+.ride .det b{color:var(--tx);font-weight:700}
+.empty{
+  font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.12em;
+  text-transform:uppercase;text-align:center;padding:20px 10px;
+}
+.totals{
+  font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.12em;
+  text-transform:uppercase;text-align:center;margin-top:11px;
+}
 .ctlnote{
   font-family:var(--mono);font-size:9.5px;color:var(--faint);letter-spacing:.12em;
   text-transform:uppercase;margin:-2px 0 10px;text-align:center;min-height:12px;
@@ -227,6 +253,9 @@ body.stale .chips{opacity:.28}
 
 /* state chips: filled when active, outline when not */
 .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:9px}
+.chips.two{grid-template-columns:repeat(2,1fr);gap:9px}
+.chips.two .chip{padding:13px 8px}
+.chips.two .cl{font-size:8.5px;letter-spacing:.16em}
 .chip{padding:11px 4px;text-align:center}
 .chip .ci{width:19px;height:19px;margin:0 auto 6px;display:block;fill:var(--faint);
           transition:fill .25s}
@@ -241,9 +270,10 @@ h2{
   font-family:var(--mono);font-size:9px;color:var(--dim);text-transform:uppercase;
   letter-spacing:.28em;margin:17px 0 9px;font-weight:700;
 }
-.trip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
-      margin-bottom:9px;clip-path:var(--chamfer-sm)}
-.trip div{background:var(--panel);padding:12px 6px;text-align:center;min-width:0}
+/* Same chamfered panels as every other card, rather than the flat 1px grid it
+   used to be, so the ride stats read as part of the same instrument. */
+.trip{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:9px}
+.trip > .panel{padding:12px 6px;text-align:center;min-width:0}
 .trip .tv{font-size:17px;font-weight:800;margin-top:3px;letter-spacing:-.03em}
 .trip .tv .su{font-family:var(--mono);font-size:9px;color:var(--dim);font-weight:700}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
@@ -291,99 +321,121 @@ pre{
 </header>
 
 <div id="status" class="status">Checking Bluetooth support&hellip;</div>
-<button id="connect" class="primary">Connect to bike</button>
 
-<section class="hero panel">
-  <div class="stale-tag">No data</div>
-  <svg class="gauge" viewBox="0 0 220 220" aria-hidden="true"><g id="ticks"></g></svg>
-  <div class="hero-c">
-    <div class="speed-n num live-val" id="speed">--</div>
-    <button class="unit" id="unit" title="Tap to switch units">km/h</button>
-  </div>
-  <div class="scale" id="scale">0 &mdash; 30</div>
-</section>
+<!-- ==================== HOME ==================== -->
+<div id="scHome">
+  <button id="connect" class="primary">Connect to bike</button>
 
-<div id="errbox"></div>
-
-<div class="grid">
-  <div class="card panel wide">
+  <div class="card panel wide homebat">
     <div class="k">Battery</div>
-    <div class="cells" id="cells"></div>
-    <div class="batsub">
+    <div class="cells" id="hCells"></div>
+    <div class="bigpct num live-val"><span id="hBatpct">--</span><span class="su">%</span></div>
+    <div class="batsub b3">
       <div>
-        <div class="kk">Charge</div>
-        <div class="vv num live-val"><span id="batpct">--</span><span class="su">%</span></div>
+        <div class="kk">Range</div>
+        <div class="vv num live-val"><span id="hRange">--</span><span class="su" id="uHRange">km</span></div>
       </div>
       <div>
         <div class="kk">Pack</div>
-        <div class="vv num live-val"><span id="volt">--</span><span class="su">V</span></div>
+        <div class="vv num live-val"><span id="hVolt">--</span><span class="su">V</span></div>
       </div>
       <div>
-        <div class="kk">Range</div>
-        <div class="vv num live-val"><span id="range">--</span><span class="su" id="uRange">km</span></div>
-      </div>
-      <div>
-        <div class="kk">Draw</div>
-        <div class="vv num live-val"><span id="amps">--</span><span class="su">A</span></div>
+        <div class="kk">Charging</div>
+        <div class="vv" id="hChg">&mdash;</div>
       </div>
     </div>
   </div>
 
-  <div class="card panel">
-    <div class="k">Assist</div>
-    <div class="v num live-val" id="gear">--</div>
-    <div class="lvls">
-      <button id="lvl0" disabled>0</button>
-      <button id="lvl1" disabled>1</button>
-      <button id="lvl2" disabled>2</button>
-      <button id="lvl3" disabled>3</button>
+  <button id="startRide" class="primary" disabled>Start ride</button>
+
+  <h2>Past rides</h2>
+  <div id="rideList"></div>
+  <div class="totals" id="totals"></div>
+</div>
+
+<!-- ==================== RIDE ==================== -->
+<div id="scRide" hidden>
+  <section class="hero panel">
+    <div class="stale-tag">No data</div>
+    <svg class="gauge" viewBox="0 0 220 220" aria-hidden="true"><g id="ticks"></g></svg>
+    <div class="hero-c">
+      <div class="speed-n num live-val" id="speed">--</div>
+      <button class="unit" id="unit" title="Tap to switch units">km/h</button>
+    </div>
+    <div class="scale" id="scale">0 &mdash; 30</div>
+  </section>
+
+  <div id="errbox"></div>
+
+  <div class="grid">
+    <div class="card panel wide">
+      <div class="k">Battery</div>
+      <div class="cells" id="cells"></div>
+      <div class="batsub">
+        <div>
+          <div class="kk">Charge</div>
+          <div class="vv num live-val"><span id="batpct">--</span><span class="su">%</span></div>
+        </div>
+        <div>
+          <div class="kk">Pack</div>
+          <div class="vv num live-val"><span id="volt">--</span><span class="su">V</span></div>
+        </div>
+        <div>
+          <div class="kk">Range</div>
+          <div class="vv num live-val"><span id="range">--</span><span class="su" id="uRange">km</span></div>
+        </div>
+        <div>
+          <div class="kk">Draw</div>
+          <div class="vv num live-val"><span id="amps">--</span><span class="su">A</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card panel">
+      <div class="k">Assist</div>
+      <div class="v num live-val" id="gear">--</div>
+      <div class="lvls">
+        <button id="lvl0" disabled>0</button>
+        <button id="lvl1" disabled>1</button>
+        <button id="lvl2" disabled>2</button>
+        <button id="lvl3" disabled>3</button>
+      </div>
+    </div>
+
+    <div class="card panel">
+      <div class="k">Your power</div>
+      <div class="v num live-val"><span id="rpow">--</span><span class="su">W</span></div>
+      <div class="segs" id="psegs"></div>
     </div>
   </div>
 
-  <div class="card panel">
-    <div class="k">Your power</div>
-    <div class="v num live-val"><span id="rpow">--</span><span class="su">W</span></div>
-    <div class="segs" id="psegs"></div>
+  <div class="chips two">
+    <div class="chip panel" id="lampTile">
+      <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2zM9 20h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z"/></svg>
+      <div class="cl">Light</div>
+      <div class="cs" id="lamp">--</div>
+    </div>
+    <div class="chip panel" id="walkTile">
+      <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5.5a2 2 0 1 0-2-2 2 2 0 0 0 2 2zM10 22l1.6-5.2-2-1.9-1.1 5.2-2-.4 1.6-7.4 2.4-2.3-.7-3-2.2 2.2-2.6-.5.4-2 1.7.3 3-3 2 .5 2.4 4.2 2.5.5-.4 2-3.4-.7 1.4 2.6L18 17l-1.7 1.2-3-3.2L12 22z"/></svg>
+      <div class="cl">Walk</div>
+      <div class="cs" id="walk">--</div>
+    </div>
   </div>
-</div>
+  <div class="ctlnote" id="ctlNote">Connect to enable controls.</div>
 
-<div class="chips">
-  <div class="chip panel" id="lampTile">
-    <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2zM9 20h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z"/></svg>
-    <div class="cl">Light</div>
-    <div class="cs" id="lamp">--</div>
+  <h2>This ride</h2>
+  <div class="trip">
+    <div class="panel"><div class="tk">Dist</div><div class="tv num"><span id="tDist">0.00</span><span class="su" id="uDist">km</span></div></div>
+    <div class="panel"><div class="tk">Moving</div><div class="tv num" id="tTime">0:00</div></div>
+    <div class="panel"><div class="tk">Avg</div><div class="tv num"><span id="tAvg">0.0</span><span class="su" id="uAvg">km/h</span></div></div>
+    <div class="panel"><div class="tk">Max</div><div class="tv num"><span id="tMax">0.0</span><span class="su" id="uMax">km/h</span></div></div>
+    <div class="panel"><div class="tk">Burned</div><div class="tv num"><span id="tCal">0</span><span class="su">kcal</span></div></div>
+    <div class="panel"><div class="tk">Avg power</div><div class="tv num"><span id="tPow">0</span><span class="su">W</span></div></div>
   </div>
-  <div class="chip panel" id="walkTile">
-    <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5.5a2 2 0 1 0-2-2 2 2 0 0 0 2 2zM10 22l1.6-5.2-2-1.9-1.1 5.2-2-.4 1.6-7.4 2.4-2.3-.7-3-2.2 2.2-2.6-.5.4-2 1.7.3 3-3 2 .5 2.4 4.2 2.5.5-.4 2-3.4-.7 1.4 2.6L18 17l-1.7 1.2-3-3.2L12 22z"/></svg>
-    <div class="cl">Throttle</div>
-    <div class="cs" id="walk">--</div>
+  <div class="row">
+    <button class="sec" id="endRide">End ride</button>
+    <button class="sec" id="keepawake">Screen on</button>
   </div>
-  <div class="chip panel" id="motorTile">
-    <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 3.5a1.2 1.2 0 0 1 1.2 1.2v5.6a1.2 1.2 0 0 1-2.4 0V6.7A1.2 1.2 0 0 1 12 5.5zM7.5 7.8a1.1 1.1 0 0 1 .5 1.9 5.2 5.2 0 1 0 8 0 1.1 1.1 0 0 1 1.5-1.6 7.4 7.4 0 1 1-11 0 1.1 1.1 0 0 1 1-0.3z"/></svg>
-    <div class="cl">Motor</div>
-    <div class="cs" id="motor">ON</div>
-  </div>
-  <div class="chip panel" id="chgTile">
-    <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
-    <div class="cl">Charging</div>
-    <div class="cs" id="chg">--</div>
-  </div>
-</div>
-<div class="ctlnote" id="ctlNote">Connect to enable controls.</div>
-
-<h2>This ride</h2>
-<div class="trip">
-  <div><div class="tk">Dist</div><div class="tv num"><span id="tDist">0.00</span><span class="su" id="uDist">km</span></div></div>
-  <div><div class="tk">Moving</div><div class="tv num" id="tTime">0:00</div></div>
-  <div><div class="tk">Avg</div><div class="tv num"><span id="tAvg">0.0</span><span class="su" id="uAvg">km/h</span></div></div>
-  <div><div class="tk">Max</div><div class="tv num"><span id="tMax">0.0</span><span class="su" id="uMax">km/h</span></div></div>
-  <div><div class="tk">Burned</div><div class="tv num"><span id="tCal">0</span><span class="su">kcal</span></div></div>
-  <div><div class="tk">Avg power</div><div class="tv num"><span id="tPow">0</span><span class="su">W</span></div></div>
-</div>
-<div class="row3">
-  <button class="sec" id="walkBtn">Walk mode</button>
-  <button class="sec" id="reset">Reset ride</button>
-  <button class="sec" id="keepawake">Screen on</button>
 </div>
 
 <details class="panel">
@@ -850,7 +902,8 @@ function parseFrame(f){
        twisting the throttle lit up a walk indicator. */
     d.lamp  = t[0x24][0] !== 0;
     d.throt = t[0x24][1] !== 0;
-    d.gear  = t[0x24][2];
+    d.gear  = t[0x24][2] & 0x0F;
+    if (t[0x24][2] >= 0x10) d.walk = true;   // never yet observed, but cheap
   }
   if (t[0x26]) d.err   = t[0x26][0];             // 0 while healthy
   /* 0x28 byte 0 is the controller's own state of charge. Correlated against
@@ -951,6 +1004,12 @@ function sendMode(lamp, walk, assist){
     return false;
   }
   queueCmd(c);
+  /* The bike never reports walk mode - 0x24 byte 1 is the throttle, and no
+     other tag carries it - so the only way to show walk state is to remember
+     what we commanded. It can drift if the handlebar changes mode, but a
+     reported gear of 0x10 or more corrects it on the next packet. */
+  bikeState.walk = !!walk;
+  renderControls();
   return true;
 }
 
@@ -1013,12 +1072,11 @@ function renderControls(){
     el.disabled = !live;
     el.className = (bikeState.gear === i && !bikeState.walk) ? "sel" : "";
   }
-  $("motorTile").classList.toggle("tap", live);
+  $("startRide").disabled = !live;
   $("lampTile").classList.toggle("tap", live);
-  $("walkBtn").disabled = !motor;
-  $("walkBtn").className = "sec" + (walkArmed ? " armed" : "");
-  $("walkBtn").textContent = walkArmed ? "Tap to confirm"
-                          : (bikeState.walk ? "Walk mode ON" : "Walk mode");
+  setChip("walkTile", "walk", bikeState.walk);   // rewrites className, so first
+  $("walkTile").classList.toggle("tap", motor);
+  $("walkTile").classList.toggle("armed", walkArmed);
   $("ctlNote").textContent = !cmdsVerified
     ? "Controls off: command table failed its checksum test."
     : (!live ? "Connect to enable controls."
@@ -1047,20 +1105,24 @@ function setArc(speed){
 
 /* battery as 10 discrete cells; low charge shows as fewer + dimmer cells,
    since there is no colour to signal it with */
-var CELLS = 10, cellEls = [];
+var CELLS = 10, cellEls = [], hCellEls = [];
 (function buildCells(){
-  var box = $("cells");
-  for (var i = 0; i < CELLS; i++){
-    var e = document.createElement("i");
-    box.appendChild(e); cellEls.push(e);
-  }
+  [["cells", cellEls], ["hCells", hCellEls]].forEach(function(pair){
+    var box = $(pair[0]);
+    for (var i = 0; i < CELLS; i++){
+      var e = document.createElement("i");
+      box.appendChild(e); pair[1].push(e);
+    }
+  });
 })();
 function setCells(pct){
   var lit = Math.round(pct / 100 * CELLS);
   var low = pct <= 30;
-  for (var i = 0; i < CELLS; i++){
-    cellEls[i].className = i < lit ? (low ? "warn" : "on") : "";
-  }
+  [cellEls, hCellEls].forEach(function(list){
+    for (var i = 0; i < CELLS; i++){
+      list[i].className = i < lit ? (low ? "warn" : "on") : "";
+    }
+  });
 }
 
 function setChip(tileId, valId, on){
@@ -1087,15 +1149,22 @@ function render(d){
     renderTrip();
   }
 
-  if (d.volts !== undefined) $("volt").textContent = fmt(d.volts, 1);
+  if (d.volts !== undefined){
+    $("volt").textContent  = fmt(d.volts, 1);
+    $("hVolt").textContent = fmt(d.volts, 1);
+  }
   /* Prefer the bike's own figure so the app agrees with the handlebar display;
      fall back to estimating from voltage only if the tag is missing. */
   if (d.soc !== undefined || d.volts !== undefined){
     var p = (d.soc !== undefined && d.soc <= 100) ? d.soc : batteryPct(d.volts);
-    $("batpct").textContent = p;
+    $("batpct").textContent  = p;
+    $("hBatpct").textContent = p;
     setCells(p);
   }
-  if (d.range !== undefined) $("range").textContent = fmt(kmh(d.range), 1);
+  if (d.range !== undefined){
+    $("range").textContent  = fmt(kmh(d.range), 1);
+    $("hRange").textContent = fmt(kmh(d.range), 1);
+  }
 
   /* Byte 8 is the charge/discharge sign, but it read "charging" on an idle,
      unplugged bike, so the polarity is not what the app implied. Show the
@@ -1106,13 +1175,13 @@ function render(d){
   if (d.gear !== undefined) $("gear").textContent = d.gear;
 
   if (d.lamp !== undefined) setChip("lampTile", "lamp", d.lamp);
-  if (d.walk !== undefined) setChip("walkTile", "walk", d.walk);
-  setChip("chgTile", "chg", detectCharging(d.volts, d.speed));
+  $("hChg").textContent = detectCharging(d.volts, d.speed) ? "Yes" : "No";
 
   /* Track what the bike says so commands are always composed from its real
      state, and refresh the controls after setChip has rewritten classNames. */
   if (d.lamp  !== undefined) bikeState.lamp  = d.lamp;
   if (d.throt !== undefined) bikeState.throt = d.throt;
+  if (d.walk  !== undefined) bikeState.walk  = d.walk;
   if (d.gear  !== undefined) bikeState.gear  = d.gear;
   if (d.speed !== undefined) bikeState.speed = d.speed;
   renderControls();
@@ -1329,6 +1398,7 @@ function setUnitLabels(){
   var d = mph ? "mi" : "km", s = mph ? "mph" : "km/h";
   $("unit").textContent = s;
   $("uRange").textContent = d;
+  $("uHRange").textContent = d;
   $("uDist").textContent  = d;
   $("uAvg").textContent   = s;
   $("uMax").textContent   = s;
@@ -1339,21 +1409,92 @@ $("unit").onclick = function(){
   mph = !mph;
   setUnitLabels();
   renderTrip();
+  renderRides();
 };
 
-$("motorTile").onclick = toggleMotor;
-$("walkBtn").onclick = tapWalk;
+$("walkTile").onclick = tapWalk;
 $("lampTile").onclick = toggleLamp;
 for (var lv = 0; lv <= 3; lv++){
   (function(n){ $("lvl" + n).onclick = function(){ setAssist(n); }; })(lv);
 }
 
-$("reset").onclick = function(){
+/* ---------- screens and ride history ---------- */
+var rides = [];
+try { rides = JSON.parse(localStorage.getItem("lectro-rides") || "[]"); } catch(e){}
+
+function saveRides(){
+  try { localStorage.setItem("lectro-rides", JSON.stringify(rides.slice(-60))); }
+  catch(e){ /* private mode or full quota - the ride is simply not kept */ }
+}
+
+function fmtWhen(ts){
+  var d = new Date(ts);
+  return d.toLocaleDateString([], {day:"numeric", month:"short"}) + "  " +
+         d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+}
+function fmtDur(ms){
+  var t = Math.floor(ms/1000), h = Math.floor(t/3600), m = Math.floor(t/60)%60;
+  return h ? h + "h " + m + "m" : m + "m " + (t%60) + "s";
+}
+
+function renderRides(){
+  var box = $("rideList");
+  if (!rides.length){
+    box.innerHTML = '<div class="empty panel">No rides yet</div>';
+    $("totals").textContent = "";
+    return;
+  }
+  var html = "", du = mph ? "mi" : "km", sp = mph ? "mph" : "km/h";
+  for (var i = rides.length - 1; i >= 0; i--){
+    var r = rides[i];
+    var hrs = r.ms / 3600000;
+    var avg = hrs > 0 ? kmh(r.dist) / hrs : 0;
+    html += '<div class="ride panel">' +
+              '<div class="when">' + fmtWhen(r.t) + '</div>' +
+              '<div class="dist num">' + fmt(kmh(r.dist), 2) +
+                '<span class="su">' + du + '</span></div>' +
+              '<div class="det">' + fmtDur(r.ms) +
+                '  &middot;  avg <b>' + fmt(avg, 1) + '</b> ' + sp +
+                '  &middot;  <b>' + Math.round(r.kcal) + '</b> kcal</div>' +
+              '<div class="det" style="text-align:right">max <b>' +
+                fmt(kmh(r.max), 1) + '</b> ' + sp + '</div>' +
+            '</div>';
+  }
+  box.innerHTML = html;
+  var td = 0, tm = 0;
+  rides.forEach(function(r){ td += r.dist; tm += r.ms; });
+  $("totals").textContent = rides.length + " rides  ·  " + fmt(kmh(td), 1) +
+                            " " + du + "  ·  " + fmtDur(tm);
+}
+
+function showScreen(name){
+  $("scHome").hidden = (name !== "home");
+  $("scRide").hidden = (name !== "ride");
+  if (name === "home") renderRides();
+}
+
+function resetTrip(){
   trip = { dist:0, ms:0, max:0, last:0, kcal:0, work:0 };
   packets = 0;
   vTrace = []; accelEMA = 0;
   showPower(0);
   renderTrip();
+}
+
+$("startRide").onclick = function(){
+  resetTrip();
+  showScreen("ride");
+};
+
+$("endRide").onclick = function(){
+  /* Only keep something that was actually a ride, otherwise a stray tap fills
+     the history with 0.00 km entries. */
+  if (trip.dist >= 0.05){
+    rides.push({ t: Date.now(), dist: trip.dist, ms: trip.ms,
+                 max: trip.max, kcal: trip.kcal, work: trip.work });
+    saveRides();
+  }
+  showScreen("home");
 };
 
 $("keepawake").onclick = function(){
@@ -1394,6 +1535,8 @@ $("copyraw").onclick = function(){
   })();
 };
 
+showScreen("home");
+renderRides();
 setUnitLabels();
 setArc(0);
 setCells(0);
