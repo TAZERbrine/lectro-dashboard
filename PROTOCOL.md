@@ -66,7 +66,7 @@ phantom "controller error 34": `0x22` is the voltage *tag byte*, and 34 is
 | Tag    | Bytes | Meaning | Scale |
 |--------|-------|---------|-------|
 | `0x20` | 2 | speed | x0.1 km/h |
-| `0x21` | 2 | current - high byte is a constant `0x80` | low byte x0.1 A |
+| `0x21` | 2 | current - high byte is `0x80` while current flows, `0x00` at exactly zero | low byte x0.1 A |
 | `0x22` | 2 | pack voltage | x0.01 V |
 | `0x23` | 2 | remaining range | x0.1 km |
 | `0x24` | 3 | front lamp, walk mode, assist level | one byte each |
@@ -74,12 +74,14 @@ phantom "controller error 34": `0x22` is the voltage *tag byte*, and 34 is
 | `0x27` | 1 | constant `01` in every capture - unknown | raw |
 | `0x28` | 4 | first byte crept 0x23 -> 0x24 while charging - unknown | raw |
 
-`0x24` was confirmed empirically: toggling the bike's light and changing assist
-level both tracked correctly.
+`0x24` confirmed empirically twice: a capture of the bike's light, walk mode and
+assist level being toggled shows exactly those three bytes stepping
+1/0 -> 0/0 -> walk 1 -> assist 1,2,3 -> 0.
 
 ## Charging is not directly reported
 
-Tag `0x21`'s high byte stays `0x80` with the charger plugged in, so it is **not**
+Tag `0x21`'s high byte is `0x80` whenever current flows and `0x00` at exactly
+zero current, and it stays `0x80` with the charger plugged in, so it is **not**
 a charge/discharge flag - the original app's `batteryCurrentPostiveNegative`
 field name is misleading. Current stays at 0.2-1.2 A, which is the controller's
 own electronics; the charger feeds the pack directly and bypasses the shunt, so

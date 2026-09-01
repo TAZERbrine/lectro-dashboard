@@ -690,7 +690,7 @@ function parseFrame(f){
 
   var d = { tags: t };
   if (t[0x20]) d.speed = (t[0x20][0] * 256 + t[0x20][1]) * 0.1;
-  if (t[0x21]) d.amps  = t[0x21][1] * 0.1;      // high byte is a constant 0x80
+  if (t[0x21]) d.amps  = t[0x21][1] * 0.1;      // hi byte 0x80 = current flowing
   if (t[0x22]) d.volts = (t[0x22][0] * 256 + t[0x22][1]) * 0.01;
   if (t[0x23]) d.range = (t[0x23][0] * 256 + t[0x23][1]) * 0.1;
   if (t[0x24]){                                  // confirmed against the bike
