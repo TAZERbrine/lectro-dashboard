@@ -232,7 +232,7 @@ body.stale .chips{opacity:.28}
 .ride .det{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.06em}
 .ride .det b{color:var(--tx);font-weight:700}
 .empty{
-  font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.12em;
+  font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.12em;
   text-transform:uppercase;text-align:center;padding:20px 10px;
 }
 .totals{
@@ -325,7 +325,7 @@ pre{
 
 <!-- ==================== HOME ==================== -->
 <div id="scHome">
-  <button id="installBtn" class="sec instbtn" hidden>Install app to home screen</button>
+  <button id="installBtn" class="sec instbtn">Install app to home screen</button>
   <button id="connect" class="primary">Connect to bike</button>
 
   <div class="card panel wide homebat">
@@ -490,11 +490,14 @@ pre{
 
 <div class="foot">
   Direct Bluetooth link &middot; no account &middot; no server<br>
-  Nothing leaves your phone
+  Nothing leaves your phone<br>
+  <span id="ver"></span>
 </div>
 
 <script>
 "use strict";
+
+var APP_VERSION = "v18";
 
 /* ------------------------------------------------------------------
    Protocol recovered from the official HeroLectro app v3.0, then
@@ -1429,19 +1432,24 @@ var deferredInstall = null;
 window.addEventListener("beforeinstallprompt", function(e){
   e.preventDefault();
   deferredInstall = e;
-  $("installBtn").hidden = false;
 });
 window.addEventListener("appinstalled", function(){
   deferredInstall = null;
   $("installBtn").hidden = true;
 });
 $("installBtn").onclick = function(){
-  if (!deferredInstall) return;
-  deferredInstall.prompt();
-  deferredInstall.userChoice.then(function(){
-    deferredInstall = null;
-    $("installBtn").hidden = true;
-  });
+  if (deferredInstall){
+    deferredInstall.prompt();
+    deferredInstall.userChoice.then(function(){
+      deferredInstall = null;
+      $("installBtn").hidden = true;
+    });
+    return;
+  }
+  /* Chrome decides for itself when to offer the prompt and often never does.
+     Say how to do it by hand rather than leave a button that does nothing. */
+  setStatus("Chrome has not offered the install prompt yet. Use its <b>&#8942; menu " +
+            "&rarr; Add to Home screen</b> - same result.", "bad");
 };
 /* Already launched from the home screen: nothing to offer. */
 try {
@@ -1568,6 +1576,7 @@ $("copyraw").onclick = function(){
   })();
 };
 
+$("ver").textContent = APP_VERSION;
 showScreen("home");
 renderRides();
 setUnitLabels();
