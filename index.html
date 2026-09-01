@@ -743,6 +743,9 @@ var TAGSZ = { 0x20:2, 0x21:2, 0x22:2, 0x23:2, 0x24:3, 0x26:1, 0x27:1, 0x28:4 };
    sometimes lands between the two halves of an FFB2 reply; a single shared
    buffer would splice those two bytes into the middle of a frame. */
 var rxBufs = {};
+/* Pre-seeded with everything observed so far, so only a genuinely new value
+   produces a line. 0x01 would mean the current really is 16-bit. */
+var seenHi = {0:1, 2:1, 128:1}, seenTail = {"128,0,0":1};
 var framesOK = 0, framesBad = 0;
 
 function crc16(b, n){
@@ -812,6 +815,21 @@ function parseFrame(f){
 
   var d = { tags: t };
   if (t[0x20]) d.speed = (t[0x20][0] * 256 + t[0x20][1]) * 0.1;
+  /* Call out any 0x21 high byte or 0x28 tail never seen before, so an unknown
+     value surfaces as one log line instead of hiding in hundreds of packets.
+     0x01 appearing under load would mean the current really is 16-bit. */
+  if (t[0x21] && !seenHi[t[0x21][0]]){
+    seenHi[t[0x21][0]] = 1;
+    logRaw("   *** NEW 0x21 high byte: 0x" + t[0x21][0].toString(16) +
+           (t[0x21][0] === 0x01 ? "  <-- current IS 16-bit after all" : ""));
+  }
+  if (t[0x28]){
+    var tail = t[0x28][1] + "," + t[0x28][2] + "," + t[0x28][3];
+    if (!seenTail[tail]){
+      seenTail[tail] = 1;
+      logRaw("   *** NEW 0x28 tail: " + tail + " (was constant 128,0,0)");
+    }
+  }
   if (t[0x21]){
     /* Low byte only. This was briefly read as a 16-bit value because one
        sample carried a high byte of 0x02, but that reading is almost certainly
