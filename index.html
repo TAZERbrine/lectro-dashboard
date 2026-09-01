@@ -201,6 +201,30 @@ body.stale .chips{opacity:.28}
 .segs i{flex:1;background:var(--track);transform:skewX(-17deg);transition:background .25s}
 .segs i.on{background:var(--tx)}
 
+/* assist level buttons */
+.lvls{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px}
+.lvls button{
+  border:0;background:var(--panel2);color:var(--dim);font-family:var(--mono);
+  font-size:12px;font-weight:800;padding:9px 0;cursor:pointer;
+  clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),
+                    calc(100% - 5px) 100%,0 100%,0 5px);
+  transition:background .2s,color .2s;
+}
+.lvls button.sel{background:var(--tx);color:var(--ink)}
+.lvls button:disabled{opacity:.28;cursor:default}
+.ctlnote{
+  font-family:var(--mono);font-size:9.5px;color:var(--faint);letter-spacing:.12em;
+  text-transform:uppercase;margin:-2px 0 10px;text-align:center;min-height:12px;
+}
+.chip.tap{cursor:pointer}
+/* armed = walk mode waiting for its confirming second tap */
+.chip.armed::before{background:var(--tx)}
+.chip.armed .ci{fill:var(--ink)}
+.chip.armed .cl,.chip.armed .cs{color:var(--ink)}
+@keyframes armpulse{50%{opacity:.45}}
+.chip.armed{animation:armpulse .7s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.chip.armed{animation:none}}
+
 /* state chips: filled when active, outline when not */
 .chips{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:9px}
 .chip{padding:12px 6px;text-align:center}
@@ -305,7 +329,12 @@ pre{
   <div class="card panel">
     <div class="k">Assist</div>
     <div class="v num live-val" id="gear">--</div>
-    <div class="segs" id="segs"></div>
+    <div class="lvls">
+      <button id="lvl0" disabled>0</button>
+      <button id="lvl1" disabled>1</button>
+      <button id="lvl2" disabled>2</button>
+      <button id="lvl3" disabled>3</button>
+    </div>
   </div>
 
   <div class="card panel">
@@ -332,6 +361,7 @@ pre{
     <div class="cs" id="chg">--</div>
   </div>
 </div>
+<div class="ctlnote" id="ctlNote">Connect to enable controls.</div>
 
 <h2>This ride</h2>
 <div class="trip">
@@ -427,9 +457,52 @@ var SVC    = "0000ffb0-0000-1000-8000-00805f9b34fb";
 var C_POLL = "0000ffb2-0000-1000-8000-00805f9b34fb";
 var C_DATA = "0000ffb1-0000-1000-8000-00805f9b34fb";
 
-var POLL_CMD = new Uint8Array([0x46, 0x11, 0x10, 0x00, 0x3E, 0x25]);
+/* ---------- command set ----------
+   Every one of these is a verbatim string literal from the official app, not
+   a constructed frame. They are re-checked against the CRC on startup below,
+   so a typo here disables the controls rather than sending junk to a motor
+   controller.
+
+   The 46 16 18 payload is a bitfield:
+       0x80 = front lamp      0x10 = walk mode      bits 0-3 = assist level  */
+var CMD = {
+  POLL:  "46 11 10 00 3E 25",
+  REQ_A: "46 11 14 00 F2 E1",     // sent once at connect by the original app
+  REQ_B: "46 11 15 00 C1 D0"      // ditto
+};
+var MODE_CMD = {
+  0x00: "46 16 18 01 00 39 20",   // assist 0
+  0x01: "46 16 18 01 01 29 01",   // assist 1
+  0x02: "46 16 18 01 02 19 62",   // assist 2
+  0x03: "46 16 18 01 03 09 43",   // assist 3
+  0x10: "46 16 18 01 10 2B 11",   // walk
+  0x80: "46 16 18 01 80 A8 A8",   // assist 0 + lamp
+  0x81: "46 16 18 01 81 B8 89",   // assist 1 + lamp
+  0x82: "46 16 18 01 82 88 EA",   // assist 2 + lamp
+  0x83: "46 16 18 01 83 98 CB",   // assist 3 + lamp
+  0x90: "46 16 18 01 90 BA 99"    // walk + lamp
+};
+var LAMP_BIT = 0x80, WALK_BIT = 0x10;
+
+function hexToBytes(s){
+  var p = s.trim().split(/\s+/), a = new Uint8Array(p.length);
+  for (var i = 0; i < p.length; i++) a[i] = parseInt(p[i], 16);
+  return a;
+}
+
+var POLL_CMD = hexToBytes(CMD.POLL);
 var POLL_MS  = 300;
 var STALE_MS = 2000;
+
+/* Commands go on a queue the poll timer drains, exactly as the original app
+   did: one per tick, falling back to the status poll when empty. Each is
+   queued twice, which is what the app does - a single dropped write would
+   otherwise silently lose the command. */
+var cmdQueue = [];
+function queueCmd(hexStr){
+  if (!hexStr) return;
+  cmdQueue.push(hexStr, hexStr);
+}
 
 var pollTimer = null, pollChar = null, pollCount = 0;
 
@@ -741,6 +814,99 @@ var tickEls = [];
   }
 })();
 
+/* ---------- controls ----------
+   Re-verify the whole command table against the CRC at startup. If any entry
+   is mistyped the controls disable themselves rather than writing a malformed
+   frame to a motor controller. */
+var cmdsVerified = false;
+(function verifyCommands(){
+  var all = [CMD.POLL, CMD.REQ_A, CMD.REQ_B], bad = [];
+  for (var k in MODE_CMD) all.push(MODE_CMD[k]);
+  for (var i = 0; i < all.length; i++){
+    var f = [];
+    hexToBytes(all[i]).forEach(function(b){ f.push(b); });
+    if (!crcOK(f)) bad.push(all[i]);
+  }
+  cmdsVerified = (bad.length === 0);
+})();
+
+/* Last state the BIKE reported - always the source of truth. Commands are
+   composed from this, never from an assumed local state, so the app cannot
+   drift out of sync with the handlebar controls. */
+var bikeState = { lamp:false, walk:false, gear:0, speed:0 };
+var walkArmed = false;
+
+function motorControlsAllowed(){
+  return cmdsVerified && !!(gatt && gatt.connected) && bikeState.speed < 0.5;
+}
+
+function sendMode(lamp, walk, assist){
+  var b = (lamp ? LAMP_BIT : 0) | (walk ? WALK_BIT : (assist & 0x03));
+  var c = MODE_CMD[b];
+  if (!c){
+    setStatus("No command exists for mode 0x" + b.toString(16) + ".", "bad");
+    return false;
+  }
+  queueCmd(c);
+  return true;
+}
+
+function toggleLamp(){
+  if (!cmdsVerified || !(gatt && gatt.connected)) return;
+  sendMode(!bikeState.lamp, bikeState.walk, bikeState.gear);
+}
+
+function setAssist(n){
+  if (!motorControlsAllowed()){
+    setStatus("Assist and walk are locked while the bike is moving.", "bad");
+    return;
+  }
+  sendMode(bikeState.lamp, false, n);
+}
+
+/* Walk mode drives the motor, so it takes two taps and only while stopped. */
+function tapWalk(){
+  if (!motorControlsAllowed()){
+    setStatus("Assist and walk are locked while the bike is moving.", "bad");
+    return;
+  }
+  if (bikeState.walk){                       // turning it OFF needs no confirm
+    sendMode(bikeState.lamp, false, bikeState.gear);
+    walkArmed = false; renderControls(); return;
+  }
+  if (!walkArmed){
+    walkArmed = true;
+    setStatus("Walk mode drives the motor. Tap WALK again to confirm.", "bad");
+    renderControls();
+    setTimeout(function(){
+      if (walkArmed){ walkArmed = false; setStatus(""); renderControls(); }
+    }, 4000);
+    return;
+  }
+  walkArmed = false;
+  setStatus("");
+  sendMode(bikeState.lamp, true, bikeState.gear);
+  renderControls();
+}
+
+function renderControls(){
+  var live  = cmdsVerified && !!(gatt && gatt.connected);
+  var motor = motorControlsAllowed();
+  for (var i = 0; i <= 3; i++){
+    var el = $("lvl" + i);
+    if (!el) continue;
+    el.disabled = !motor;
+    el.className = (bikeState.gear === i && !bikeState.walk) ? "sel" : "";
+  }
+  $("lampTile").classList.toggle("tap", live);
+  $("walkTile").classList.toggle("tap", motor);
+  $("walkTile").classList.toggle("armed", walkArmed);
+  $("ctlNote").textContent = !cmdsVerified
+    ? "Controls off: command table failed its checksum test."
+    : (!live ? "Connect to enable controls."
+             : (motor ? "" : "Assist and walk locked while moving."));
+}
+
 var modelName = null, fwVersion = null;
 
 function renderInfo(){
@@ -784,18 +950,6 @@ function setChip(tileId, valId, on){
   $(tileId).className = "chip panel" + (on ? " on" : "");
 }
 
-function renderSegs(g){
-  if (g > maxGear) maxGear = g;
-  var box = $("segs");
-  if (box.childElementCount !== maxGear){
-    box.innerHTML = "";
-    for (var i = 0; i < maxGear; i++) box.appendChild(document.createElement("i"));
-  }
-  for (var j = 0; j < box.children.length; j++){
-    box.children[j].className = (j < g) ? "on" : "";
-  }
-}
-
 function render(d){
   var now = Date.now();
 
@@ -829,14 +983,19 @@ function render(d){
      flag is in the diagnostics panel so it can be settled while charging. */
   if (d.amps !== undefined) $("amps").textContent = fmt(d.amps, 1);
 
-  if (d.gear !== undefined){
-    $("gear").textContent = d.gear;
-    renderSegs(d.gear);
-  }
+  if (d.gear !== undefined) $("gear").textContent = d.gear;
 
   if (d.lamp !== undefined) setChip("lampTile", "lamp", d.lamp);
   if (d.walk !== undefined) setChip("walkTile", "walk", d.walk);
   setChip("chgTile", "chg", detectCharging(d.volts, d.speed));
+
+  /* Track what the bike says so commands are always composed from its real
+     state, and refresh the controls after setChip has rewritten classNames. */
+  if (d.lamp  !== undefined) bikeState.lamp  = d.lamp;
+  if (d.walk  !== undefined) bikeState.walk  = d.walk;
+  if (d.gear  !== undefined) bikeState.gear  = d.gear;
+  if (d.speed !== undefined) bikeState.speed = d.speed;
+  renderControls();
 
   /* Tag 0x26 is a single byte and reads 0 on a healthy bike, so it can be
      trusted directly - no plausibility filter needed now that frames are
@@ -989,10 +1148,17 @@ async function connect(){
     logRaw("could not open the request channel: " + (e.message || e));
   }
 
+  /* The original app sends these two zero-payload requests on every connect.
+     They are almost certainly what makes the bike report its model and
+     firmware - packets the app can parse but we had never triggered. */
+  queueCmd(CMD.REQ_A);
+  queueCmd(CMD.REQ_B);
+
   document.body.classList.add("connected");
   setConn("live", "live");
   setStatus("");
   $("connect").textContent = "Reconnect";
+  renderControls();
   renderInfo();
 }
 
@@ -1000,12 +1166,17 @@ function startPolling(){
   stopPolling();
   pollTimer = setInterval(function(){
     if (!pollChar || !gatt || !gatt.connected) return;
+
+    var pending = cmdQueue.length ? cmdQueue.shift() : null;
+    var bytes = pending ? hexToBytes(pending) : POLL_CMD;
+
     var p = pollChar.properties.writeWithoutResponse
-      ? pollChar.writeValueWithoutResponse(POLL_CMD)
-      : pollChar.writeValueWithResponse(POLL_CMD);
+      ? pollChar.writeValueWithoutResponse(bytes)
+      : pollChar.writeValueWithResponse(bytes);
     p.then(function(){
       pollCount++;
-      if (pollCount === 1) logRaw("first request sent OK");
+      if (pending) logRaw("   <- sent command " + pending);
+      else if (pollCount === 1) logRaw("first request sent OK");
     }).catch(function(e){
       if (pollCount === 0){
         logRaw("request failed: " + (e.message || e));
@@ -1021,9 +1192,12 @@ function stopPolling(){
 
 function onDrop(){
   stopPolling();
+  cmdQueue.length = 0;
+  walkArmed = false;
   document.body.classList.remove("connected", "stale");
   setConn("offline", "");
   setStatus("Bike disconnected. Tap Reconnect when it is back in range.", "bad");
+  renderControls();
 }
 
 /* ---------- controls ---------- */
@@ -1042,6 +1216,12 @@ $("unit").onclick = function(){
   setUnitLabels();
   renderTrip();
 };
+
+$("lampTile").onclick = toggleLamp;
+$("walkTile").onclick = tapWalk;
+for (var lv = 0; lv <= 3; lv++){
+  (function(n){ $("lvl" + n).onclick = function(){ setAssist(n); }; })(lv);
+}
 
 $("reset").onclick = function(){
   trip = { dist:0, ms:0, max:0, last:0, kcal:0, work:0 };
@@ -1091,8 +1271,8 @@ $("copyraw").onclick = function(){
 setUnitLabels();
 setArc(0);
 setCells(0);
-renderSegs(0);
 showPower(0);
+renderControls();
 loadSetup();
 renderTrip();
 renderInfo();
