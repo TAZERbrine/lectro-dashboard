@@ -247,6 +247,9 @@ h2{
 .trip .tv{font-size:17px;font-weight:800;margin-top:3px;letter-spacing:-.03em}
 .trip .tv .su{font-family:var(--mono);font-size:9px;color:var(--dim);font-weight:700}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+.sec.armed{background:var(--tx);color:var(--ink)}
+.sec:disabled{opacity:.3}
 
 /* ---------------- diagnostics ---------------- */
 details{padding:13px 14px;margin-top:11px}
@@ -377,9 +380,10 @@ pre{
   <div><div class="tk">Burned</div><div class="tv num"><span id="tCal">0</span><span class="su">kcal</span></div></div>
   <div><div class="tk">Avg power</div><div class="tv num"><span id="tPow">0</span><span class="su">W</span></div></div>
 </div>
-<div class="row">
+<div class="row3">
+  <button class="sec" id="walkBtn">Walk mode</button>
   <button class="sec" id="reset">Reset ride</button>
-  <button class="sec" id="keepawake">Keep screen on</button>
+  <button class="sec" id="keepawake">Screen on</button>
 </div>
 
 <details class="panel">
@@ -944,8 +948,10 @@ function renderControls(){
   }
   $("motorTile").classList.toggle("tap", live);
   $("lampTile").classList.toggle("tap", live);
-  $("walkTile").classList.toggle("tap", motor);
-  $("walkTile").classList.toggle("armed", walkArmed);
+  $("walkBtn").disabled = !motor;
+  $("walkBtn").className = "sec" + (walkArmed ? " armed" : "");
+  $("walkBtn").textContent = walkArmed ? "Tap to confirm"
+                          : (bikeState.walk ? "Walk mode ON" : "Walk mode");
   $("ctlNote").textContent = !cmdsVerified
     ? "Controls off: command table failed its checksum test."
     : (!live ? "Connect to enable controls."
@@ -1277,8 +1283,8 @@ $("unit").onclick = function(){
 };
 
 $("motorTile").onclick = toggleMotor;
+$("walkBtn").onclick = tapWalk;
 $("lampTile").onclick = toggleLamp;
-$("walkTile").onclick = tapWalk;
 for (var lv = 0; lv <= 3; lv++){
   (function(n){ $("lvl" + n).onclick = function(){ setAssist(n); }; })(lv);
 }
