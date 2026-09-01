@@ -66,7 +66,7 @@ phantom "controller error 34": `0x22` is the voltage *tag byte*, and 34 is
 | Tag    | Bytes | Meaning | Scale |
 |--------|-------|---------|-------|
 | `0x20` | 2 | speed | x0.1 km/h |
-| `0x21` | 2 | current. High byte meaning UNKNOWN - see below | low byte x0.1 A |
+| `0x21` | 2 | current, 16-bit. Top bit is a flag; mask it off | `(raw & 0x7FFF) x0.1 A` |
 | `0x22` | 2 | pack voltage | x0.01 V |
 | `0x23` | 2 | remaining range | x0.1 km |
 | `0x24` | 3 | front lamp, **throttle held**, assist level | one byte each |
@@ -85,12 +85,30 @@ on a single window where it happened to read `00` during a motor cut; a longer
 capture shows it flickering `01/00/01/00` with the bike stationary and untouched.
 Its meaning is unknown.
 
-### Assist 0 disables the motor entirely
+### Assist 0 does NOT disable the motor
 
-With `0x24` byte 2 at `0`, the controller will not drive - throttle included.
-A capture of the throttle held for six seconds at assist 0 shows speed pinned at
-0.0 km/h and current never rising above 1.0 A, which is just the electronics.
-Any client that wants the motor to work must set an assist level of 1 or higher.
+An earlier note here claimed it did, from a capture where the throttle was held
+at assist 0 and nothing moved. That capture is explained by the motor being
+disabled - the client had not sent `46 16 17 01 01` on connect. Once the connect
+sequence was corrected, the throttle drives normally at assist 0.
+
+### Current is 16 bits
+
+`0x21` must be read as a 16-bit value with the top bit masked off:
+`amps = (((hi & 0x7F) << 8) | lo) * 0.1`. Reading only the low byte silently
+truncates anything above 25.5 A - a real acceleration surge of `02 A5`
+(67.7 A) was being reported as 16.5 A.
+
+The top bit is set when the bike is idle or coasting and clear under motor
+load, but it is also set while charging, so it is not a charge/discharge flag.
+Meaning still unknown.
+
+### Charging is not detectable while riding
+
+Pack voltage sags under motor load, which masks any charging trend, and the
+current tag does not distinguish a charger from an idle bike. Charging can
+only be inferred from voltage rising while stationary, so a bike being ridden
+on a stand while plugged in will not register as charging until it stops.
 
 ## Charging is not directly reported
 

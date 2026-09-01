@@ -775,7 +775,15 @@ function parseFrame(f){
 
   var d = { tags: t };
   if (t[0x20]) d.speed = (t[0x20][0] * 256 + t[0x20][1]) * 0.1;
-  if (t[0x21]) d.amps  = t[0x21][1] * 0.1;      // hi byte 0x80 = current flowing
+  if (t[0x21]){
+    /* 16-bit, not one byte. A real acceleration surge read 02 A5 = 67.7 A;
+       reading only the low byte reported 16.5 A and silently truncated
+       everything above 25.5 A. The top bit is a flag of unknown meaning - it
+       is set when idle and clear under motor load - so it is masked off the
+       magnitude and reported separately. */
+    d.amps     = (((t[0x21][0] & 0x7F) << 8) | t[0x21][1]) * 0.1;
+    d.ampsFlag = (t[0x21][0] & 0x80) !== 0;
+  }
   if (t[0x22]) d.volts = (t[0x22][0] * 256 + t[0x22][1]) * 0.01;
   if (t[0x23]) d.range = (t[0x23][0] * 256 + t[0x23][1]) * 0.1;
   if (t[0x24]){
@@ -802,13 +810,18 @@ var vHist = [];
 function detectCharging(volts, speed){
   var now = Date.now();
   if (volts === undefined) return false;
-  vHist.push([now, volts]);
-  while (vHist.length && now - vHist[0][0] > 40000) vHist.shift();
-  if (speed !== undefined && speed > 1){ vHist = []; return false; }
+
+  /* Only stationary samples are comparable - pack voltage sags hard under
+     motor load, which would mask a charge. Previously any movement wiped the
+     history entirely, so a bike charging on a stand while the wheel was spun
+     never registered. Now movement just means "no new sample". */
+  if (speed === undefined || speed <= 1) vHist.push([now, volts]);
+  while (vHist.length && now - vHist[0][0] > 180000) vHist.shift();
   if (vHist.length < 12) return false;
+
   var span = (vHist[vHist.length - 1][0] - vHist[0][0]) / 1000;
   var rise = vHist[vHist.length - 1][1] - vHist[0][1];
-  return span > 20 && rise >= 0.02;
+  return span > 25 && rise >= 0.03;
 }
 
 /* ---------- gauge: discrete ticks around an arc ---------- */
@@ -1044,7 +1057,8 @@ function render(d){
       parts.push("0x" + Number(tg).toString(16) + ":" + hex(d.tags[tg]).replace(/ /g, ""));
     }
     $("errdbg").textContent = "frames ok " + framesOK + " / dropped " + framesBad +
-                              "   ·   " + parts.join("  ");
+      "   ·   0x21 flag " + (d.ampsFlag ? "1" : "0") +
+      "   ·   " + parts.join("  ");
   }
 }
 
