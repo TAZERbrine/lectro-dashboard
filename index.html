@@ -589,7 +589,7 @@ pre{
 <script>
 "use strict";
 
-var APP_VERSION = "v24";
+var APP_VERSION = "v25";
 
 /* ------------------------------------------------------------------
    Protocol recovered from the official HeroLectro app v3.0, then
@@ -776,12 +776,12 @@ try {
 /* Speed arrives quantised to 0.1 km/h, so a per-packet difference is mostly
    noise. Measure acceleration across a ~1.5 s baseline instead: steady
    enough to trust, short enough to catch a throttle release quickly. */
-var vTrace = [], lastV = null, accelEMA = 0;
+var vTrace = [], lastV = null, accelEMA = 0, powerEMA = 0;
 
 function riderPower(d, dt){
   if (d.speed === undefined) return 0;
   var v = d.speed / 3.6;                       // m/s
-  if (v <= 0.2){ vTrace = []; accelEMA = 0; return 0; }
+  if (v <= 0.2){ vTrace = []; accelEMA = 0; powerEMA = 0; return 0; }
   var mass = rider.kg + rider.bike;            // always held in kg
 
   /* Acceleration matters, and leaving it out was a real error: coasting down
@@ -813,7 +813,17 @@ function riderPower(d, dt){
      anything under that as noise rather than book phantom calories, and cap
      the top so one bad speed sample cannot record a 2 kW effort. */
   var p = need - motor;
-  return (p < RIDER_FLOOR) ? 0 : Math.min(600, p);
+  p = (p < RIDER_FLOOR) ? 0 : Math.min(600, p);
+
+  /* Smooth the OUTPUT as well as the acceleration going in. Speed arrives
+     quantised, so the acceleration term swings hard between samples and the
+     raw residual thrashes - a real sustained effort produced
+     301, 0, 0, 237, 0, 120, 58, 0 across successive packets, which is
+     unreadable on screen and wrong on average. A ~1s time constant settles it
+     without hiding genuine changes. */
+  var k = Math.min(1, dt / 1.0);
+  powerEMA = powerEMA + (p - powerEMA) * k * 0.55;
+  return powerEMA < RIDER_FLOOR ? 0 : powerEMA;
 }
 
 var PSEGS = 5, pSegEls = [];
@@ -1637,7 +1647,7 @@ function showScreen(name){
 function resetTrip(){
   trip = { dist:0, ms:0, max:0, last:0, kcal:0, work:0 };
   packets = 0;
-  vTrace = []; accelEMA = 0;
+  vTrace = []; accelEMA = 0; powerEMA = 0;
   showPower(0);
   renderTrip();
 }
