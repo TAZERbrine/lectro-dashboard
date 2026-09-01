@@ -27,11 +27,21 @@
   --chamfer-sm:polygon(9px 0, 100% 0, 100% calc(100% - 9px),
                        calc(100% - 9px) 100%, 0 100%, 0 9px);
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  /* Depth in a monochrome scheme has to come from gradient, edge highlight and
+     shadow rather than colour. --lift is the top edge catching the light. */
+  --face:linear-gradient(177deg,#17171b 0%,#0d0d0f 58%,#08080a 100%);
+  --lift:rgba(255,255,255,.07);
+  --shadow-1:0 2px 5px rgba(0,0,0,.55), 0 8px 22px rgba(0,0,0,.4);
+  --shadow-2:0 1px 3px rgba(0,0,0,.5);
 }
 :root[data-theme="day"]{
   --bg:#ffffff; --panel:#ffffff; --panel2:#f2f2f4; --line:#c9c9cf;
   --tx:#000000; --dim:#55555e; --faint:#9a9aa2; --track:#e2e2e6;
   --ink:#ffffff;
+  --face:linear-gradient(177deg,#ffffff 0%,#f7f8fa 60%,#eef0f4 100%);
+  --lift:rgba(255,255,255,.9);
+  --shadow-1:0 2px 5px rgba(0,0,0,.13), 0 8px 22px rgba(0,0,0,.10);
+  --shadow-2:0 1px 3px rgba(0,0,0,.12);
 }
 /* Riding in real darkness: pure white on pure black dazzles and wrecks your
    night vision, so this pulls the whole scale down rather than inverting it. */
@@ -39,6 +49,10 @@
   --bg:#0a0a0c; --panel:#121214; --panel2:#171719; --line:#232327;
   --tx:#a8a8b0; --dim:#63636b; --faint:#3c3c43; --track:#1c1c1f;
   --ink:#0a0a0c;
+  --face:linear-gradient(177deg,#161619 0%,#111113 60%,#0d0d0f 100%);
+  --lift:rgba(255,255,255,.05);
+  --shadow-1:0 2px 5px rgba(0,0,0,.5), 0 8px 20px rgba(0,0,0,.35);
+  --shadow-2:0 1px 3px rgba(0,0,0,.45);
 }
 @media (prefers-color-scheme: light){
   :root:not([data-theme="night"]):not([data-theme="day"]):not([data-theme="dim"]){
@@ -58,11 +72,31 @@ body{
   max-width:560px;margin-inline:auto;
 }
 .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+@keyframes screenIn{from{opacity:0;transform:translateY(10px) scale(.985)}
+                    to{opacity:1;transform:none}}
+#scHome:not([hidden]),#scRide:not([hidden]){animation:screenIn .26s cubic-bezier(.2,.8,.2,1)}
+/* a value that just changed gets a brief lift, so the eye catches the update */
+@keyframes bump{0%{transform:scale(1)}35%{transform:scale(1.07)}100%{transform:scale(1)}}
+.bumped{animation:bump .28s cubic-bezier(.3,.9,.3,1)}
+@media (prefers-reduced-motion:reduce){
+  #scHome,#scRide,.bumped{animation:none}
+  button,.chip{transition:none}
+}
 
 /* chamfered panel with a true 1px edge */
-.panel{position:relative;background:var(--line);clip-path:var(--chamfer)}
-.panel::before{content:"";position:absolute;inset:1px;background:var(--panel);
-               clip-path:var(--chamfer)}
+.panel{
+  position:relative;background:var(--line);clip-path:var(--chamfer);
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));
+}
+.panel::before{
+  content:"";position:absolute;inset:1px;background:var(--face);
+  clip-path:var(--chamfer);
+}
+/* a single lit pixel along the top edge - what actually sells the bevel */
+.panel::after{
+  content:"";position:absolute;left:14px;right:2px;top:1px;height:1px;
+  background:var(--lift);pointer-events:none;
+}
 .panel > *{position:relative;z-index:1}
 
 /* ---------------- header ---------------- */
@@ -95,10 +129,14 @@ header{display:flex;align-items:center;gap:9px;margin-bottom:8px}
 
 /* ---------------- buttons ---------------- */
 button{font-family:inherit}
+button,.chip{transition:transform .09s cubic-bezier(.4,0,.2,1), filter .15s}
+.primary:active,.sec:active,.iconbtn:active,.lvls button:active{transform:translateY(2px) scale(.985)}
+.chip.tap:active{transform:translateY(2px) scale(.98)}
 .primary{
   width:100%;border:0;cursor:pointer;background:var(--tx);color:var(--ink);
   font-family:var(--mono);font-size:13px;font-weight:800;letter-spacing:.2em;
   text-transform:uppercase;padding:16px;clip-path:var(--chamfer);margin-bottom:11px;
+  box-shadow:var(--shadow-1);
 }
 .primary:disabled{opacity:.4}
 /* Scoped to Connect only. As a bare .primary this also greyed out START RIDE,
@@ -138,11 +176,11 @@ body.connected #connect{
 .hero{margin-bottom:7px;display:grid;place-items:center;padding:8px 8px 13px}
 .gauge{width:min(45vw,174px);height:auto;display:block}
 .gauge .tick{stroke:var(--track);stroke-width:3.4}
-.gauge .tick.on{stroke:var(--tx)}
+.gauge .tick.on{stroke:var(--tx);filter:drop-shadow(0 0 3px rgba(255,255,255,.55))}
 .hero-c{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
 .speed-n{
   font-size:clamp(44px,14.5vw,66px);font-weight:800;line-height:.92;
-  letter-spacing:-.045em;
+  letter-spacing:-.045em;text-shadow:0 0 26px rgba(255,255,255,.16);
 }
 .unit{
   background:none;border:0;color:var(--dim);font-family:var(--mono);font-size:10px;
@@ -179,7 +217,7 @@ body.stale .chips{opacity:.28}
 /* battery: skewed cells, lit = solid */
 .cells{display:flex;gap:3px;margin:7px 0 8px;height:15px}
 .cells i{flex:1;background:var(--track);transform:skewX(-17deg);transition:background .3s}
-.cells i.on{background:var(--tx)}
+.cells i.on{background:var(--tx);box-shadow:0 0 8px rgba(255,255,255,.22)}
 .cells i.warn{background:var(--dim)}
 .batsub{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .batsub .vv{font-size:14px;font-weight:800;margin-top:2px;letter-spacing:-.03em}
@@ -201,7 +239,7 @@ body.stale .chips{opacity:.28}
 /* assist: skewed bars */
 .segs{display:flex;gap:3px;margin-top:7px;height:7px}
 .segs i{flex:1;background:var(--track);transform:skewX(-17deg);transition:background .25s}
-.segs i.on{background:var(--tx)}
+.segs i.on{background:var(--tx);box-shadow:0 0 7px rgba(255,255,255,.25)}
 
 /* assist level buttons */
 .lvls{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:7px}
@@ -212,7 +250,8 @@ body.stale .chips{opacity:.28}
                     calc(100% - 5px) 100%,0 100%,0 5px);
   transition:background .2s,color .2s;
 }
-.lvls button.sel{background:var(--tx);color:var(--ink)}
+.lvls button.sel{background:var(--tx);color:var(--ink);
+                 box-shadow:0 0 10px rgba(255,255,255,.3)}
 .lvls button:disabled{opacity:.28;cursor:default}
 .instbtn{margin-bottom:11px}
 .homebat{margin-bottom:11px}
@@ -263,6 +302,8 @@ body.stale .chips{opacity:.28}
 .chip .cs{font-family:var(--mono);font-size:10.5px;font-weight:800;color:var(--faint);
           margin-top:2px;letter-spacing:.14em}
 .chip.on::before{background:var(--tx)}
+.chip.on{filter:drop-shadow(0 0 10px rgba(255,255,255,.28))}
+.chip.on::after{opacity:0}
 .chip.on .ci{fill:var(--ink)}
 .chip.on .cl,.chip.on .cs{color:var(--ink)}
 
@@ -419,7 +460,7 @@ pre{
     </div>
     <div class="chip panel" id="walkTile">
       <svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5.5a2 2 0 1 0-2-2 2 2 0 0 0 2 2zM10 22l1.6-5.2-2-1.9-1.1 5.2-2-.4 1.6-7.4 2.4-2.3-.7-3-2.2 2.2-2.6-.5.4-2 1.7.3 3-3 2 .5 2.4 4.2 2.5.5-.4 2-3.4-.7 1.4 2.6L18 17l-1.7 1.2-3-3.2L12 22z"/></svg>
-      <div class="cl">Walk</div>
+      <div class="cl">Hold to walk</div>
       <div class="cs" id="walk">--</div>
     </div>
   </div>
@@ -497,7 +538,7 @@ pre{
 <script>
 "use strict";
 
-var APP_VERSION = "v20";
+var APP_VERSION = "v21";
 
 /* ------------------------------------------------------------------
    Protocol recovered from the official HeroLectro app v3.0, then
@@ -988,7 +1029,6 @@ var cmdsVerified = false;
    composed from this, never from an assumed local state, so the app cannot
    drift out of sync with the handlebar controls. */
 var bikeState = { lamp:false, walk:false, gear:0, speed:0, motor:true };
-var walkArmed = false;
 
 /* Changing assist level while riding is normal - it is exactly what the
    handlebar buttons do - so it is allowed whenever connected. Walk mode and
@@ -1043,28 +1083,40 @@ function setAssist(n){
   sendMode(bikeState.lamp, false, n);
 }
 
-/* Walk mode drives the motor, so it takes two taps and only while stopped. */
-function tapWalk(){
+/* Walk is hold-to-walk, like the button on the bike itself: it runs while you
+   hold it and stops the moment you let go. The previous two-tap confirm was
+   worse in every way - the first tap only armed it, so a single press blinked
+   and timed out without ever engaging, and a mode that drives the bike should
+   not stay latched on after your finger leaves. Holding also re-asserts the
+   command, which matters if the controller expects it repeated. */
+var walkTimer = null, walking = false;
+
+function walkStart(){
+  if (walking) return;
   if (!motorControlsAllowed()){
-    setStatus("Assist and walk are locked while the bike is moving.", "bad");
+    setStatus("Walk mode only works while the bike is stopped.", "bad");
     return;
   }
-  if (bikeState.walk){                       // turning it OFF needs no confirm
-    sendMode(bikeState.lamp, false, bikeState.gear);
-    walkArmed = false; renderControls(); return;
-  }
-  if (!walkArmed){
-    walkArmed = true;
-    setStatus("Walk mode drives the motor. Tap WALK again to confirm.", "bad");
-    renderControls();
-    setTimeout(function(){
-      if (walkArmed){ walkArmed = false; setStatus(""); renderControls(); }
-    }, 4000);
-    return;
-  }
-  walkArmed = false;
-  setStatus("");
+  walking = true;
   sendMode(bikeState.lamp, true, bikeState.gear);
+  walkTimer = setInterval(function(){
+    if (!gatt || !gatt.connected){ walkStop(); return; }
+    sendMode(bikeState.lamp, true, bikeState.gear);
+  }, 600);
+  renderControls();
+}
+
+function walkStop(){
+  if (!walking) return;
+  walking = false;
+  if (walkTimer){ clearInterval(walkTimer); walkTimer = null; }
+  /* The exact release sequence the original app sends, in its order. */
+  queueCmd(CMD.MOTOR_OFF);
+  queueCmd(MODE_CMD[0x00]);
+  queueCmd(CMD.MOTOR_ON);
+  sendMode(bikeState.lamp, false, bikeState.gear);
+  bikeState.walk = false;
+  setStatus("");
   renderControls();
 }
 
@@ -1079,9 +1131,9 @@ function renderControls(){
   }
   $("startRide").disabled = !live;
   $("lampTile").classList.toggle("tap", live);
-  setChip("walkTile", "walk", bikeState.walk);   // rewrites className, so first
+  setChip("walkTile", "walk", walking);        // rewrites className, so first
   $("walkTile").classList.toggle("tap", motor);
-  $("walkTile").classList.toggle("armed", walkArmed);
+  $("walkTile").classList.toggle("armed", walking);
   $("ctlNote").textContent = !cmdsVerified
     ? "Controls off: command table failed its checksum test."
     : (!live ? "Connect to enable controls."
@@ -1130,6 +1182,18 @@ function setCells(pct){
   });
 }
 
+/* Set a value and, if it actually changed, give it a brief bump so a glance
+   catches the update. Restarting the animation needs the class removed and a
+   reflow forced, otherwise a rapid second change does nothing. */
+function setVal(id, text){
+  var el = $(id);
+  if (!el || el.textContent === text) return;
+  el.textContent = text;
+  el.classList.remove("bumped");
+  void el.offsetWidth;
+  el.classList.add("bumped");
+}
+
 function setChip(tileId, valId, on){
   $(valId).textContent = on ? "On" : "Off";
   $(tileId).className = "chip panel" + (on ? " on" : "");
@@ -1155,20 +1219,20 @@ function render(d){
   }
 
   if (d.volts !== undefined){
-    $("volt").textContent  = fmt(d.volts, 1);
-    $("hVolt").textContent = fmt(d.volts, 1);
+    setVal("volt",  fmt(d.volts, 1));
+    setVal("hVolt", fmt(d.volts, 1));
   }
   /* Prefer the bike's own figure so the app agrees with the handlebar display;
      fall back to estimating from voltage only if the tag is missing. */
   if (d.soc !== undefined || d.volts !== undefined){
     var p = (d.soc !== undefined && d.soc <= 100) ? d.soc : batteryPct(d.volts);
-    $("batpct").textContent  = p;
-    $("hBatpct").textContent = p;
+    setVal("batpct",  String(p));
+    setVal("hBatpct", String(p));
     setCells(p);
   }
   if (d.range !== undefined){
-    $("range").textContent  = fmt(kmh(d.range), 1);
-    $("hRange").textContent = fmt(kmh(d.range), 1);
+    setVal("range",  fmt(kmh(d.range), 1));
+    setVal("hRange", fmt(kmh(d.range), 1));
   }
 
   /* Byte 8 is the charge/discharge sign, but it read "charging" on an idle,
@@ -1177,7 +1241,7 @@ function render(d){
      flag is in the diagnostics panel so it can be settled while charging. */
   if (d.amps !== undefined) $("amps").textContent = fmt(d.amps, 1);
 
-  if (d.gear !== undefined) $("gear").textContent = d.gear;
+  if (d.gear !== undefined) setVal("gear", String(d.gear));
 
   if (d.lamp !== undefined) setChip("lampTile", "lamp", d.lamp);
   $("hChg").textContent = detectCharging(d.volts, d.speed) ? "Yes" : "No";
@@ -1391,7 +1455,7 @@ function stopPolling(){
 function onDrop(){
   stopPolling();
   cmdQueue.length = 0;
-  walkArmed = false;
+  walkStop();
   document.body.classList.remove("connected", "stale");
   setConn("offline", "");
   setStatus("Bike disconnected. Tap Reconnect when it is back in range.", "bad");
@@ -1417,7 +1481,14 @@ $("unit").onclick = function(){
   renderRides();
 };
 
-$("walkTile").onclick = tapWalk;
+(function(){
+  var w = $("walkTile");
+  w.addEventListener("pointerdown", function(e){ e.preventDefault(); walkStart(); });
+  ["pointerup","pointercancel","pointerleave"].forEach(function(ev){
+    w.addEventListener(ev, walkStop);
+  });
+  w.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+})();
 $("lampTile").onclick = toggleLamp;
 for (var lv = 0; lv <= 3; lv++){
   (function(n){ $("lvl" + n).onclick = function(){ setAssist(n); }; })(lv);
