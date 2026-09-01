@@ -65,7 +65,7 @@ phantom "controller error 34": `0x22` is the voltage *tag byte*, and 34 is
 
 | Tag    | Bytes | Meaning | Scale |
 |--------|-------|---------|-------|
-| `0x20` | 2 | speed | x0.1 km/h |
+| `0x20` | 2 | speed, verified against an independent reference | x0.1 km/h |
 | `0x21` | 2 | high byte = status (`80` idle, `00` under load, `02` seen at peak), low byte = current | low byte x0.1 A |
 | `0x22` | 2 | pack voltage | x0.01 V |
 | `0x23` | 2 | remaining range | x0.1 km |
@@ -238,6 +238,22 @@ TOGGLE_ASSIST and TOGGLE_CRUISE. So the original app *did* ship these controls.
   "report model" and "report version", which would explain why the app has
   model/version parsers that never fire here: **we have never sent the
   requests that trigger them.**
+
+## Verified against a second vehicle
+
+Riding alongside a scooter indicating 20 km/h, 29 cruise samples read
+16.7-19.9 km/h, averaging 18.7. Vehicle speedometers are required never to
+under-read and typically over-read by 5-10%, so a true ~18.7-19 displaying as
+20 is exactly the expected relationship. Speed scaling is confirmed.
+
+The same capture re-confirms `0x28` byte 0 as state of charge on fresh data at
+the top of the range: 39.95 V -> 90%, 39.03 V -> 83%, 40.44 V -> 94%, against a
+fit predicting 90 / 82 / 94.
+
+It also adds evidence against reading `0x21` as 16-bit. High bytes observed
+across this ride were `0x00`, `0x02` and `0x80` - `0x01` is still absent after
+several thousand packets, and the one `0x02` sample reads 14.0 A as a low byte
+against 65.2 A as 16 bits.
 
 ## Open questions
 
