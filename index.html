@@ -813,13 +813,16 @@ function parseFrame(f){
   var d = { tags: t };
   if (t[0x20]) d.speed = (t[0x20][0] * 256 + t[0x20][1]) * 0.1;
   if (t[0x21]){
-    /* 16-bit, not one byte. A real acceleration surge read 02 A5 = 67.7 A;
-       reading only the low byte reported 16.5 A and silently truncated
-       everything above 25.5 A. The top bit is a flag of unknown meaning - it
-       is set when idle and clear under motor load - so it is masked off the
-       magnitude and reported separately. */
-    d.amps     = (((t[0x21][0] & 0x7F) << 8) | t[0x21][1]) * 0.1;
-    d.ampsFlag = (t[0x21][0] & 0x80) !== 0;
+    /* Low byte only. This was briefly read as a 16-bit value because one
+       sample carried a high byte of 0x02, but that reading is almost certainly
+       wrong: it makes that sample 67.7 A - 2.3 kW on a 250 W-class pedelec -
+       and a genuine ramp to 67.7 A would have to cross the 25.6-51.1 A band,
+       whose high byte 0x01 has never appeared in any capture. As the low byte
+       alone it is 16.5 A / 572 W, an unremarkable peak.
+       The high byte is therefore treated as status, not magnitude: 0x80 when
+       idle or coasting, 0x00 under motor load, 0x02 seen once at peak. */
+    d.amps     = t[0x21][1] * 0.1;
+    d.ampsFlag = t[0x21][0];
   }
   if (t[0x22]) d.volts = (t[0x22][0] * 256 + t[0x22][1]) * 0.01;
   if (t[0x23]) d.range = (t[0x23][0] * 256 + t[0x23][1]) * 0.1;
@@ -832,6 +835,13 @@ function parseFrame(f){
     d.gear  = t[0x24][2];
   }
   if (t[0x26]) d.err   = t[0x26][0];             // 0 while healthy
+  /* 0x28 byte 0 is the controller's own state of charge. Correlated against
+     pack voltage over 19 samples spanning 33.9-37.5 V it fits
+     byte0 = 8.98*V - 268.9 with R^2 = 0.993, which puts 0% at 29.9 V and 100%
+     at 41.1 V - a 10-cell pack at 3.0-4.1 V per cell. It is also filtered:
+     during a 67 A surge the voltage sagged but the byte barely moved, so it
+     does not dive on every acceleration the way a voltage curve does. */
+  if (t[0x28]) d.soc = t[0x28][0];
   /* 0x27 flickers between 00 and 01 with no rider input, so it is NOT a
      reliable motor-enable state. Captured, not displayed as truth. */
   if (t[0x27]) d.flag27 = t[0x27][0];
@@ -1060,9 +1070,11 @@ function render(d){
     renderTrip();
   }
 
-  if (d.volts !== undefined){
-    $("volt").textContent = fmt(d.volts, 1);
-    var p = batteryPct(d.volts);
+  if (d.volts !== undefined) $("volt").textContent = fmt(d.volts, 1);
+  /* Prefer the bike's own figure so the app agrees with the handlebar display;
+     fall back to estimating from voltage only if the tag is missing. */
+  if (d.soc !== undefined || d.volts !== undefined){
+    var p = (d.soc !== undefined && d.soc <= 100) ? d.soc : batteryPct(d.volts);
     $("batpct").textContent = p;
     setCells(p);
   }
@@ -1103,7 +1115,7 @@ function render(d){
       parts.push("0x" + Number(tg).toString(16) + ":" + hex(d.tags[tg]).replace(/ /g, ""));
     }
     $("errdbg").textContent = "frames ok " + framesOK + " / dropped " + framesBad +
-      "   ·   0x21 flag " + (d.ampsFlag ? "1" : "0") +
+      "   ·   0x21 hi 0x" + (d.ampsFlag || 0).toString(16) +
       "   ·   " + parts.join("  ");
   }
 }

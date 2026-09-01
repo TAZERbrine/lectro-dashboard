@@ -66,13 +66,13 @@ phantom "controller error 34": `0x22` is the voltage *tag byte*, and 34 is
 | Tag    | Bytes | Meaning | Scale |
 |--------|-------|---------|-------|
 | `0x20` | 2 | speed | x0.1 km/h |
-| `0x21` | 2 | current, 16-bit. Top bit is a flag; mask it off | `(raw & 0x7FFF) x0.1 A` |
+| `0x21` | 2 | high byte = status (`80` idle, `00` under load, `02` seen at peak), low byte = current | low byte x0.1 A |
 | `0x22` | 2 | pack voltage | x0.01 V |
 | `0x23` | 2 | remaining range | x0.1 km |
 | `0x24` | 3 | front lamp, **throttle held**, assist level | one byte each |
 | `0x26` | 1 | error code, `0` when healthy | raw |
 | `0x27` | 1 | flickers `00`/`01` with no rider input - NOT reliable motor state | raw |
-| `0x28` | 4 | first byte crept 0x23 -> 0x24 while charging - unknown | raw |
+| `0x28` | 4 | **byte 0 = battery percent** (controller's own, filtered). Bytes 1-3 constant `80 00 00` | raw |
 
 `0x24` byte 1 is the **throttle**, not walk mode. In a throttle test it held `1`
 for six continuous seconds while the throttle was twisted, and an earlier build
@@ -92,16 +92,32 @@ at assist 0 and nothing moved. That capture is explained by the motor being
 disabled - the client had not sent `46 16 17 01 01` on connect. Once the connect
 sequence was corrected, the throttle drives normally at assist 0.
 
-### Current is 16 bits
+### Current is the low byte; the high byte is status
 
-`0x21` must be read as a 16-bit value with the top bit masked off:
-`amps = (((hi & 0x7F) << 8) | lo) * 0.1`. Reading only the low byte silently
-truncates anything above 25.5 A - a real acceleration surge of `02 A5`
-(67.7 A) was being reported as 16.5 A.
+`0x21` was briefly read as a 16-bit magnitude because one sample carried a high
+byte of `0x02`. That is almost certainly wrong. As 16 bits that sample is
+67.7 A - 2.3 kW on a 250 W-class pedelec - and a genuine ramp to 67.7 A would
+have to pass through the 25.6-51.1 A band, whose high byte `0x01` has never
+appeared in any capture. Read as the low byte alone it is 16.5 A / 572 W, an
+unremarkable peak.
 
-The top bit is set when the bike is idle or coasting and clear under motor
-load, but it is also set while charging, so it is not a charge/discharge flag.
-Meaning still unknown.
+High byte values seen: `0x80` idle or coasting, `0x00` under motor load, `0x02`
+once at peak. Its meaning is unresolved.
+
+### Tag 0x28 byte 0 is the controller's state of charge
+
+Correlated against pack voltage over 19 samples spanning 33.9-37.5 V:
+
+```
+byte0 = 8.98 * volts - 268.9      R^2 = 0.993
+0%   at 29.94 V        100% at 41.08 V
+```
+
+That is a 10-cell pack at 3.0-4.1 V per cell. It is also filtered: during a
+peak-current sample the pack sagged to 34.67 V while the byte read 46 rather
+than the 42 the fit predicts, so it does not collapse on every acceleration
+the way a voltage curve does. Prefer it over estimating from voltage - it is
+the same number the bike's own display shows.
 
 ### Charging is not detectable while riding
 
