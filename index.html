@@ -872,8 +872,15 @@ var bikeState = { lamp:false, walk:false, gear:0, speed:0, motor:true };
 var walkArmed = false;
 var connectWarned = false;   // one-time 'are you stopped?' gate on Connect
 
+/* Changing assist level while riding is normal - it is exactly what the
+   handlebar buttons do - so it is allowed whenever connected. Walk mode and
+   switching the motor off are different in kind: one drives the bike on its
+   own, the other removes assist under way. Those stay locked while moving. */
+function assistAllowed(){
+  return cmdsVerified && !!(gatt && gatt.connected);
+}
 function motorControlsAllowed(){
-  return cmdsVerified && !!(gatt && gatt.connected) && bikeState.speed < 0.5;
+  return assistAllowed() && bikeState.speed < 0.5;
 }
 
 function sendMode(lamp, walk, assist){
@@ -905,10 +912,10 @@ function toggleLamp(){
 }
 
 function setAssist(n){
-  if (!motorControlsAllowed()){
-    setStatus("Assist and walk are locked while the bike is moving.", "bad");
-    return;
-  }
+  if (!assistAllowed()) return;
+  /* Picking a level leaves walk mode. Preserving walk instead would make the
+     button look dead, and leaving walk is the safe direction anyway - the
+     motor stops driving the bike on its own. */
   sendMode(bikeState.lamp, false, n);
 }
 
@@ -943,7 +950,7 @@ function renderControls(){
   for (var i = 0; i <= 3; i++){
     var el = $("lvl" + i);
     if (!el) continue;
-    el.disabled = !motor;
+    el.disabled = !live;
     el.className = (bikeState.gear === i && !bikeState.walk) ? "sel" : "";
   }
   $("motorTile").classList.toggle("tap", live);
@@ -955,7 +962,7 @@ function renderControls(){
   $("ctlNote").textContent = !cmdsVerified
     ? "Controls off: command table failed its checksum test."
     : (!live ? "Connect to enable controls."
-             : (motor ? "" : "Assist and walk locked while moving."));
+             : (motor ? "" : "Walk mode locked while moving."));
 }
 
 var modelName = null, fwVersion = null;
