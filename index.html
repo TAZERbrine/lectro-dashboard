@@ -214,6 +214,7 @@ body.stale .chips{opacity:.28}
 }
 .lvls button.sel{background:var(--tx);color:var(--ink)}
 .lvls button:disabled{opacity:.28;cursor:default}
+.instbtn{margin-bottom:11px}
 .homebat{margin-bottom:11px}
 .bigpct{font-size:44px;font-weight:800;letter-spacing:-.04em;line-height:1;margin:10px 0 12px}
 .bigpct .su{font-family:var(--mono);font-size:14px;color:var(--dim);font-weight:700;margin-left:4px}
@@ -324,6 +325,7 @@ pre{
 
 <!-- ==================== HOME ==================== -->
 <div id="scHome">
+  <button id="installBtn" class="sec instbtn" hidden>Install app to home screen</button>
   <button id="connect" class="primary">Connect to bike</button>
 
   <div class="card panel wide homebat">
@@ -1417,6 +1419,37 @@ $("lampTile").onclick = toggleLamp;
 for (var lv = 0; lv <= 3; lv++){
   (function(n){ $("lvl" + n).onclick = function(){ setAssist(n); }; })(lv);
 }
+
+/* ---------- install ----------
+   The page is already a proper installable app - manifest, icons, offline
+   service worker - but Chrome buries that behind a menu. Catch the install
+   prompt and offer it as a button instead of expecting anyone to find it. */
+var deferredInstall = null;
+
+window.addEventListener("beforeinstallprompt", function(e){
+  e.preventDefault();
+  deferredInstall = e;
+  $("installBtn").hidden = false;
+});
+window.addEventListener("appinstalled", function(){
+  deferredInstall = null;
+  $("installBtn").hidden = true;
+});
+$("installBtn").onclick = function(){
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  deferredInstall.userChoice.then(function(){
+    deferredInstall = null;
+    $("installBtn").hidden = true;
+  });
+};
+/* Already launched from the home screen: nothing to offer. */
+try {
+  if (window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone === true){
+    $("installBtn").hidden = true;
+  }
+} catch(e){}
 
 /* ---------- screens and ride history ---------- */
 var rides = [];
